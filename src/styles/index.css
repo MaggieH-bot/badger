@@ -20,10 +20,15 @@
   --text-secondary: #b3bcc6;
   --text-muted: #8b95a0;
 
-  /* Brand — steel blue, brightened so it reads clearly on dark */
+  /* Brand — steel blue, brightened so it reads clearly on dark.
+     --accent is for text-on-dark uses (BADGER wordmark, links, active tab
+     pills, focus rings). --accent-strong is the deeper button-bg variant
+     where white text needs to read at AA contrast. */
   --accent: #5fa1d8;
   --accent-hover: #7ab5e8;
   --accent-muted: rgba(95, 161, 216, 0.20);
+  --accent-strong: #2f74bd;
+  --accent-strong-hover: #266aa8;
 
   /* Urgency — internal follow-up tokens
      cold = past cadence (clean red), warming = approaching (amber),
@@ -312,13 +317,13 @@ body {
 }
 
 .btn--primary {
-  background: var(--accent);
-  color: #0a1419;
+  background: var(--accent-strong);
+  color: #ffffff;
 }
 
 .btn--primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 2px 8px rgba(95, 161, 216, 0.4);
+  background: var(--accent-strong-hover);
+  box-shadow: 0 2px 8px rgba(47, 116, 189, 0.45);
 }
 
 .btn--secondary {
