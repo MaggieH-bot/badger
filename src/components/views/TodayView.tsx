@@ -127,7 +127,7 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
     <div className="view">
       <h2>Today</h2>
 
-      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} />
+      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope="active" />
 
       <div className="today-summary">
         <button
@@ -208,7 +208,7 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
 
       {!hasAny ? (
         <div className="empty-state">
-          <p>No active deals.</p>
+          <p>No active clients.</p>
           <p>Click "+ Add Client" to create your first client.</p>
         </div>
       ) : hasTodayWorthy ? (

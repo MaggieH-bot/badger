@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { findPendingInviteForCurrentUser, markInviteAccepted } from './invites';
 
 export interface Workspace {
   id: string;
@@ -43,6 +44,16 @@ async function fetchOwnedWorkspace(userId: string): Promise<Workspace | null> {
   return (data as Workspace | null) ?? null;
 }
 
+async function fetchWorkspaceById(workspaceId: string): Promise<Workspace | null> {
+  const { data, error } = await supabase
+    .from('workspaces')
+    .select('id, name')
+    .eq('id', workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Workspace | null) ?? null;
+}
+
 async function createWorkspace(userId: string): Promise<Workspace> {
   const { data, error } = await supabase
     .from('workspaces')
@@ -54,10 +65,16 @@ async function createWorkspace(userId: string): Promise<Workspace> {
   return data as Workspace;
 }
 
-async function addOwnerMembership(workspaceId: string, userId: string): Promise<void> {
+type MemberRole = 'owner' | 'member';
+
+async function addMembership(
+  workspaceId: string,
+  userId: string,
+  role: MemberRole,
+): Promise<void> {
   const { error } = await supabase
     .from('workspace_members')
-    .insert({ workspace_id: workspaceId, user_id: userId, role: 'owner' });
+    .insert({ workspace_id: workspaceId, user_id: userId, role });
 
   if (error) throw error;
 }
@@ -67,27 +84,77 @@ async function addOwnerMembership(workspaceId: string, userId: string): Promise<
  *
  * Idempotent and partial-failure-safe:
  *   1. If the user is already a member of a workspace → return it (fast path).
- *   2. If not, but the user previously created a workspace whose membership insert
- *      failed → finish setup by adding the missing membership row.
- *   3. Otherwise → create a fresh workspace + owner membership.
+ *   2. NEW: if a pending invite exists for the user's email → accept it,
+ *      join that workspace as a member. (This is what makes Charlie land in
+ *      Maggie's workspace instead of bootstrapping his own.)
+ *   3. If they previously created a workspace whose membership insert failed
+ *      → finish setup by adding the missing membership row.
+ *   4. Otherwise → create a fresh workspace + owner membership.
  *
- * If step 3's membership insert fails, the workspace is left as a recoverable
- * orphan (not deleted) — the next call hits step 2 and completes setup.
+ * If a step's insert fails partway, the next call recovers via the same ladder.
  */
-export async function ensureWorkspaceForCurrentUser(userId: string): Promise<Workspace> {
+export async function ensureWorkspaceForCurrentUser(
+  userId: string,
+  email: string | null,
+): Promise<Workspace> {
   // 1. Already a member?
   const member = await fetchWorkspaceViaMembership(userId);
   if (member) return member;
 
-  // 2. Created but missing membership? (recovery from prior partial failure)
+  // 2. Pending invite for our email?
+  if (email) {
+    const invite = await findPendingInviteForCurrentUser(email);
+    if (invite) {
+      await addMembership(invite.workspaceId, userId, 'member');
+      // Mark accepted (audit trail). Best-effort: don't fail the join if this fails.
+      try {
+        await markInviteAccepted(invite.inviteId);
+      } catch (err) {
+        console.warn('[badger] could not mark invite accepted:', err);
+      }
+      const ws = await fetchWorkspaceById(invite.workspaceId);
+      if (ws) return ws;
+    }
+  }
+
+  // 3. Created but missing membership? (recovery from prior partial failure)
   const owned = await fetchOwnedWorkspace(userId);
   if (owned) {
-    await addOwnerMembership(owned.id, userId);
+    await addMembership(owned.id, userId, 'owner');
     return owned;
   }
 
-  // 3. Bootstrap fresh
+  // 4. Bootstrap fresh
   const created = await createWorkspace(userId);
-  await addOwnerMembership(created.id, userId);
+  await addMembership(created.id, userId, 'owner');
   return created;
+}
+
+/**
+ * List members of a workspace with their email + role.
+ * Note: Supabase RLS may restrict which auth.users rows are visible; we
+ * gracefully fall back to user_id when email is unavailable.
+ */
+export interface WorkspaceMember {
+  userId: string;
+  role: string;
+  email: string | null;
+  joinedAt: string;
+}
+
+export async function listWorkspaceMembers(
+  workspaceId: string,
+): Promise<WorkspaceMember[]> {
+  const { data, error } = await supabase
+    .from('workspace_members')
+    .select('user_id, role, created_at')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    userId: row.user_id as string,
+    role: row.role as string,
+    email: null,
+    joinedAt: row.created_at as string,
+  }));
 }

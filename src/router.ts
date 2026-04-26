@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AppRoute } from './types';
 import { useUIPreferences } from './store/useUIPreferences';
 
-const VALID_ROUTES: AppRoute[] = ['#/', '#/pipeline', '#/closed', '#/import'];
+const VALID_ROUTES: AppRoute[] = ['#/', '#/pipeline', '#/closed', '#/import', '#/workspace'];
 
 // Legacy route map: old hash → new hash
 const ROUTE_MIGRATIONS: Record<string, AppRoute> = {

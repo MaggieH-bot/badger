@@ -279,7 +279,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
             id="dt-comments"
             className="note-textarea"
             rows={3}
-            placeholder="Short context for this deal — for longer entries, use Notes."
+            placeholder="Short context for this client — for longer entries, use Notes."
             value={form.comments}
             onChange={(e) => handleChange('comments', e.target.value)}
           />

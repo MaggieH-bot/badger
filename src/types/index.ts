@@ -135,7 +135,7 @@ export interface PipelineStore {
 
 export type TeamFilter = Assignee | 'All';
 
-export type AppRoute = '#/' | '#/pipeline' | '#/closed' | '#/import';
+export type AppRoute = '#/' | '#/pipeline' | '#/closed' | '#/import' | '#/workspace';
 
 export type PipelineViewMode = 'table' | 'board';
 

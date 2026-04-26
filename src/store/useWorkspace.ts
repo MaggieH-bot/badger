@@ -25,7 +25,7 @@ export function useWorkspaceState(): WorkspaceContextValue {
     if (!user) return;
     let mounted = true;
 
-    ensureWorkspaceForCurrentUser(user.id)
+    ensureWorkspaceForCurrentUser(user.id, user.email ?? null)
       .then((ws) => {
         if (!mounted) return;
         setWorkspace(ws);

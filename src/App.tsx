@@ -12,6 +12,7 @@ import { TodayView } from './components/views/TodayView';
 import { PipelineView } from './components/views/PipelineView';
 import { ClosedTransactionsView } from './components/views/ClosedTransactionsView';
 import { ImportView } from './components/views/ImportView';
+import { WorkspaceView } from './components/views/WorkspaceView';
 import { DealForm } from './components/deals/DealForm';
 import { DealDrawer } from './components/drawer/DealDrawer';
 import { LoginScreen } from './components/auth/LoginScreen';
@@ -80,6 +81,7 @@ function AppContent() {
             <ClosedTransactionsView onSelectDeal={handleSelectDeal} />
           )}
           {route === '#/import' && <ImportView />}
+          {route === '#/workspace' && <WorkspaceView />}
         </>
       )}
       {selectedDealId && (

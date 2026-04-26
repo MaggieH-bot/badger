@@ -121,7 +121,7 @@ function ChooseStage({
   return (
     <div className="import-choose">
       <p className="import-intro">
-        Upload a CSV with your existing pipeline. Each row becomes a deal in Badger.
+        Upload a CSV with your existing pipeline. Each row becomes a client in Badger.
       </p>
 
       <div className="import-section">
@@ -293,7 +293,7 @@ function DoneStage({
   return (
     <div className="import-done">
       <p className="import-done-msg">
-        ✓ Imported {count} {count === 1 ? 'deal' : 'deals'}.
+        ✓ Imported {count} {count === 1 ? 'client' : 'clients'}.
       </p>
       <div className="form-actions">
         <button type="button" className="btn btn--secondary" onClick={onStartOver}>

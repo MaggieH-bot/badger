@@ -45,7 +45,7 @@ export function PipelineBoardView({ onSelectDeal }: PipelineBoardViewProps) {
           </div>
           <div className="pipeline-column-cards">
             {grouped[stage].length === 0 ? (
-              <p className="pipeline-column-empty">No deals</p>
+              <p className="pipeline-column-empty">No clients</p>
             ) : (
               grouped[stage].map((deal) => (
                 <DealCard key={deal.id} deal={deal} onClick={onSelectDeal} />

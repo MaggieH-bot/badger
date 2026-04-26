@@ -144,7 +144,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.neverContacted) {
     return {
       priority: 'high',
-      reason: 'No contact has been logged for this deal yet.',
+      reason: 'No contact has been logged for this client yet.',
       suggestedTouch: 'Reach out and log your first touch.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
@@ -197,7 +197,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'hot' && d.blocker?.trim()) {
     return {
       priority: 'high',
-      reason: `Hot deal blocked: ${d.blocker.trim()}`,
+      reason: `Hot client blocked: ${d.blocker.trim()}`,
       suggestedTouch: 'Tackle the blocker with the client directly.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
@@ -422,4 +422,4 @@ export function sortByInsightPriority(items: DealWithInsight[]): DealWithInsight
 }
 
 export const CALM_BRIEFING_MESSAGE =
-  'All active deals are on track. Use this window to deepen a Nurture or Watch relationship.';
+  'All active clients are on track. Use this window to deepen a Nurture or Watch relationship.';

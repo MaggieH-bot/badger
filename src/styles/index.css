@@ -950,6 +950,26 @@ body {
   min-width: 800px;
 }
 
+/* Responsive: desktop uses table, mobile uses card list. */
+.deals-table-desktop {
+  display: block;
+}
+
+.deals-cards-mobile {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 767px) {
+  .deals-table-desktop {
+    display: none;
+  }
+  .deals-cards-mobile {
+    display: flex;
+  }
+}
+
 .deals-table-th {
   text-align: left;
   padding: 12px var(--space-md);
@@ -2348,5 +2368,121 @@ body {
   .danger-zone-row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/* ============================================
+   Workspace View
+   ============================================ */
+
+.workspace-intro {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  line-height: 1.5;
+}
+
+.workspace-intro strong {
+  color: var(--text-primary);
+}
+
+.workspace-section {
+  margin-bottom: var(--space-xl);
+}
+
+.workspace-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-section-help {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: var(--space-sm);
+  line-height: 1.5;
+}
+
+.workspace-invite-form {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.workspace-invite-input {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 13px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.workspace-invite-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.workspace-flash {
+  font-size: 12px;
+  color: var(--success);
+  margin-top: var(--space-sm);
+}
+
+.workspace-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.workspace-list-row:last-child {
+  border-bottom: none;
+}
+
+.workspace-list-primary {
+  flex: 1;
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.workspace-list-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.workspace-muted {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 599px) {
+  .workspace-invite-form {
+    flex-direction: column;
+  }
+  .workspace-list-row {
+    flex-wrap: wrap;
+  }
+  .workspace-list-meta {
+    flex-basis: 100%;
   }
 }

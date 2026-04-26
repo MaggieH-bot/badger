@@ -30,6 +30,13 @@ export function NavBar({ route, navigate, onAddDeal }: NavBarProps) {
         <div className="navbar-actions">
           <button
             type="button"
+            className={`navbar-link${route === '#/workspace' ? ' navbar-link--active' : ''}`}
+            onClick={() => navigate('#/workspace')}
+          >
+            Workspace
+          </button>
+          <button
+            type="button"
             className={`navbar-link${route === '#/import' ? ' navbar-link--active' : ''}`}
             onClick={() => navigate('#/import')}
           >

@@ -1,20 +1,35 @@
 import { useUIPreferences } from '../../store/useUIPreferences';
 
+type Scope = 'active' | 'closed' | 'workspace';
+
 interface TeamFilterHiddenBannerProps {
   hiddenCount: number;
+  scope?: Scope;
 }
 
-export function TeamFilterHiddenBanner({ hiddenCount }: TeamFilterHiddenBannerProps) {
+const SCOPE_NOUN: Record<Scope, { singular: string; plural: string }> = {
+  active: { singular: 'active client', plural: 'active clients' },
+  closed: { singular: 'closed client', plural: 'closed clients' },
+  workspace: { singular: 'client', plural: 'clients' },
+};
+
+export function TeamFilterHiddenBanner({
+  hiddenCount,
+  scope = 'active',
+}: TeamFilterHiddenBannerProps) {
   const { preferences, dispatch } = useUIPreferences();
 
   if (hiddenCount === 0 || preferences.activeTeamFilter === 'All') {
     return null;
   }
 
+  const noun = hiddenCount === 1 ? SCOPE_NOUN[scope].singular : SCOPE_NOUN[scope].plural;
+  const verb = hiddenCount === 1 ? 'is' : 'are';
+
   return (
     <div className="filter-hidden-banner" role="status">
       <span className="filter-hidden-banner-text">
-        {hiddenCount === 1 ? '1 deal is' : `${hiddenCount} deals are`} hidden by Team:{' '}
+        {hiddenCount} {noun} {verb} hidden by Team:{' '}
         <strong>{preferences.activeTeamFilter}</strong> filter.
       </span>
       <button

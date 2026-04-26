@@ -5,6 +5,7 @@ import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { computeUrgency } from '../../utils/urgency';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
+import { DealCard } from '../deals/DealCard';
 
 export type DealsTableMode = 'pipeline' | 'closed';
 
@@ -157,17 +158,17 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
   if (sorted.length === 0) {
     return (
       <>
-        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} />
+        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
         <div className="empty-state">
           {mode === 'pipeline' ? (
             <>
-              <p>No active deals match the current filter.</p>
+              <p>No active clients match the current filter.</p>
               <p>Click "+ Add Client" to create a client, or change the team filter.</p>
             </>
           ) : (
             <>
               <p>No closed transactions match the current filter.</p>
-              <p>Closed deals will appear here once their stage is set to Closed.</p>
+              <p>Closed clients will appear here once their stage is set to Closed.</p>
             </>
           )}
         </div>
@@ -177,8 +178,15 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
 
   return (
     <>
-      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} />
-      <div className="table-wrap">
+      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
+
+      <div className="deals-cards-mobile">
+        {sorted.map((deal) => (
+          <DealCard key={deal.id} deal={deal} onClick={onSelectDeal} />
+        ))}
+      </div>
+
+      <div className="table-wrap deals-table-desktop">
       <table className="deals-table">
         <thead>
           <tr>
