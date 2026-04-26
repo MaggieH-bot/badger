@@ -2,6 +2,7 @@ import type { AppRoute, Category, DealWithUrgency } from '../../types';
 import { CATEGORIES, CATEGORY_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
+import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
 import { computeUrgency, sortByAttentionWithinCategory } from '../../utils/urgency';
 import {
   computeInsight,
@@ -35,13 +36,17 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
 
-  // Filter: exclude closed + apply team filter
-  const filtered = deals.filter(
+  // Stage filter first (active deals only) — used for filter-hidden count
+  const activeDeals = deals.filter((d) => d.stage !== 'closed');
+
+  // Then apply team filter
+  const filtered = activeDeals.filter(
     (d) =>
-      d.stage !== 'closed' &&
-      (preferences.activeTeamFilter === 'All' ||
-        d.assignedTo === preferences.activeTeamFilter),
+      preferences.activeTeamFilter === 'All' ||
+      d.assignedTo === preferences.activeTeamFilter,
   );
+
+  const hiddenByTeamFilter = activeDeals.length - filtered.length;
 
   const withUrgency = filtered.map((d) => computeUrgency(d));
 
@@ -121,6 +126,8 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   return (
     <div className="view">
       <h2>Today</h2>
+
+      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} />
 
       <div className="today-summary">
         <button

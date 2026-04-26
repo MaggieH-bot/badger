@@ -4,6 +4,7 @@ import { STAGE_LABELS, CATEGORY_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { computeUrgency } from '../../utils/urgency';
+import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
 
 export type DealsTableMode = 'pipeline' | 'closed';
 
@@ -115,17 +116,21 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('daysSinceContact');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Stage filter by mode + team filter
-  const filtered = deals.filter((d) => {
+  // Stage filter by mode (active vs closed) — used to compute filter-hidden count
+  const stageMatched = deals.filter((d) => {
     if (mode === 'pipeline' && d.stage === 'closed') return false;
     if (mode === 'closed' && d.stage !== 'closed') return false;
-    if (
-      preferences.activeTeamFilter !== 'All' &&
-      d.assignedTo !== preferences.activeTeamFilter
-    )
-      return false;
     return true;
   });
+
+  // Then apply team filter
+  const filtered = stageMatched.filter(
+    (d) =>
+      preferences.activeTeamFilter === 'All' ||
+      d.assignedTo === preferences.activeTeamFilter,
+  );
+
+  const hiddenByTeamFilter = stageMatched.length - filtered.length;
 
   const withUrgency = filtered.map((d) => computeUrgency(d));
 
@@ -151,24 +156,29 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
 
   if (sorted.length === 0) {
     return (
-      <div className="empty-state">
-        {mode === 'pipeline' ? (
-          <>
-            <p>No active deals match the current filter.</p>
-            <p>Click "+ Add Client" to create a client, or change the team filter.</p>
-          </>
-        ) : (
-          <>
-            <p>No closed transactions match the current filter.</p>
-            <p>Closed deals will appear here once their stage is set to Closed.</p>
-          </>
-        )}
-      </div>
+      <>
+        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} />
+        <div className="empty-state">
+          {mode === 'pipeline' ? (
+            <>
+              <p>No active deals match the current filter.</p>
+              <p>Click "+ Add Client" to create a client, or change the team filter.</p>
+            </>
+          ) : (
+            <>
+              <p>No closed transactions match the current filter.</p>
+              <p>Closed deals will appear here once their stage is set to Closed.</p>
+            </>
+          )}
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="table-wrap">
+    <>
+      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} />
+      <div className="table-wrap">
       <table className="deals-table">
         <thead>
           <tr>
@@ -230,6 +240,7 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }

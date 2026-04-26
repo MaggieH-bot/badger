@@ -2265,6 +2265,45 @@ body {
   text-decoration: underline;
 }
 
+.filter-hidden-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  background: var(--accent-muted);
+  border: 1px solid rgba(95, 161, 216, 0.32);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+}
+
+.filter-hidden-banner-text {
+  flex: 1;
+}
+
+.filter-hidden-banner-text strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.filter-hidden-banner-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.filter-hidden-banner-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
 .danger-zone {
   margin-top: var(--space-xl);
   padding: var(--space-md);

@@ -2,12 +2,14 @@ import { useState, useRef, type ChangeEvent } from 'react';
 import type { ImportResult } from '../../utils/csvImport';
 import { parseImport } from '../../utils/csvImport';
 import { useDeals } from '../../store/useDeals';
+import { useUIPreferences } from '../../store/useUIPreferences';
 import { useRouter } from '../../router';
 
 type Stage = 'choose' | 'preview' | 'done';
 
 export function ImportView() {
   const { dispatch } = useDeals();
+  const { dispatch: dispatchUI } = useUIPreferences();
   const { navigate } = useRouter();
   const [stage, setStage] = useState<Stage>('choose');
   const [fileName, setFileName] = useState<string>('');
@@ -46,6 +48,10 @@ export function ImportView() {
     if (dealsToImport.length === 0) return;
 
     dispatch({ type: 'ADD_DEALS', deals: dealsToImport });
+    // Reset the team filter so the user can actually see what they just
+    // imported. Without this, a stale 'Partner'/'You' filter silently hides
+    // every record whose assignee doesn't match.
+    dispatchUI({ type: 'SET_TEAM_FILTER', filter: 'All' });
     setImportedCount(dealsToImport.length);
     setStage('done');
   }
