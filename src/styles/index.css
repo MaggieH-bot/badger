@@ -16,8 +16,8 @@
   --border-strong: rgba(220, 230, 240, 0.18);
 
   /* Text — cool off-white to slate, brightened for small-label readability */
-  --text-primary: #eef2f7;
-  --text-secondary: #b3bcc6;
+  --text-primary: #f5f8fb;
+  --text-secondary: #c0c8d2;
   --text-muted: #8b95a0;
 
   /* Brand — steel blue, brightened so it reads clearly on dark.
@@ -45,15 +45,15 @@
   /* Categories — primary readiness lens
      Bright burnt orange / honey / moss — kept distinct from steel blue and red */
   --category-hot: #ed8a3e;
-  --category-hot-bg: rgba(237, 138, 62, 0.18);
+  --category-hot-bg: rgba(237, 138, 62, 0.28);
   --category-nurture: #e0b04a;
-  --category-nurture-bg: rgba(224, 176, 74, 0.18);
+  --category-nurture-bg: rgba(224, 176, 74, 0.26);
   --category-watch: #7fa572;
-  --category-watch-bg: rgba(127, 165, 114, 0.18);
+  --category-watch-bg: rgba(127, 165, 114, 0.28);
 
   /* Alert — cleaner saturated red, reserved for needs-attention / errors / destructive */
   --alert: #d04535;
-  --alert-bg: rgba(208, 69, 53, 0.20);
+  --alert-bg: rgba(208, 69, 53, 0.28);
 
   /* Semantic */
   --danger: #d04535;
@@ -636,10 +636,10 @@ body {
 }
 
 .today-summary-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--text-primary);
 }
 

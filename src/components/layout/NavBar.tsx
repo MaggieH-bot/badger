@@ -26,7 +26,6 @@ export function NavBar({ route, navigate, onAddDeal }: NavBarProps) {
       <div className="navbar-row navbar-row--top">
         <div className="navbar-brand">
           <span className="navbar-brand-name">BADGER</span>
-          <span className="navbar-brand-tagline">Digs up what needs your attention.</span>
         </div>
         <div className="navbar-actions">
           <button
