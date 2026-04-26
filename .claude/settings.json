@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(rm -f App.css index.css)",
+      "Bash(rm -rf assets)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
