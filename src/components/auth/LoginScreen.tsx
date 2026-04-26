@@ -33,7 +33,6 @@ export function LoginScreen() {
       <div className="login-card">
         <div className="login-brand">
           <span className="login-brand-name">BADGER</span>
-          <span className="login-brand-tagline">Digs up what needs your attention.</span>
         </div>
 
         {status === 'sent' ? (
