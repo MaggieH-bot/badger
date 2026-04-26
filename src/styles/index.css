@@ -269,7 +269,7 @@ body {
   border: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 6px 8px;
   border-radius: var(--radius-sm);
@@ -613,17 +613,9 @@ body {
   background: var(--category-hot-bg);
 }
 
-.today-summary-card--hot .today-summary-count {
-  color: var(--category-hot);
-}
-
 .today-summary-card--nurture {
   border-top-color: var(--category-nurture);
   background: var(--category-nurture-bg);
-}
-
-.today-summary-card--nurture .today-summary-count {
-  color: var(--category-nurture);
 }
 
 .today-summary-card--watch {
@@ -631,17 +623,9 @@ body {
   background: var(--category-watch-bg);
 }
 
-.today-summary-card--watch .today-summary-count {
-  color: var(--category-watch);
-}
-
 .today-summary-card--attention {
   border-top-color: var(--alert);
   background: var(--alert-bg);
-}
-
-.today-summary-card--attention .today-summary-count {
-  color: var(--alert);
 }
 
 .today-summary-count {
