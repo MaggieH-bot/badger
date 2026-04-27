@@ -422,6 +422,10 @@ export function ActivityTab({ deal }: ActivityTabProps) {
     <div className="drawer-tab-content">
       <section className="tab-section">
         <h3 className="tab-section-title">Log Activity</h3>
+        <p className="tab-section-help">
+          Records a touch with the client (call, text, email, meeting). Updates
+          their last-contact date and removes them from First Touch.
+        </p>
         <LogActivityForm dealId={deal.id} />
         {logEntries.length === 0 ? (
           <p className="empty-state empty-state--spaced">No activity logged yet.</p>
@@ -454,6 +458,11 @@ export function ActivityTab({ deal }: ActivityTabProps) {
 
       <section className="tab-section">
         <h3 className="tab-section-title">Notes</h3>
+        <p className="tab-section-help">
+          Freeform observations for your own reference. <strong>Does not</strong>{' '}
+          count as a contact — clients with notes but no logged activity stay in
+          First Touch.
+        </p>
         <AddNoteForm dealId={deal.id} />
         {deal.notes.length === 0 ? (
           <p className="empty-state">No notes yet.</p>

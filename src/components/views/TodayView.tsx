@@ -126,26 +126,58 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   const hasTodayWorthy = todayWorthy.length > 0;
   const populatedCategories = CATEGORIES.filter((cat) => grouped[cat].length > 0);
 
+  // A summary card is enabled whenever it has a non-zero count. The click
+  // handler routes to the best available target so the card never looks
+  // clickable without doing something useful.
   const canClick = {
-    hot: grouped.hot.length > 0,
-    nurture: grouped.nurture.length > 0,
-    watch: grouped.watch.length > 0,
-    needsAttention: todayWorthy.some(
-      (d) => d.followUpStatus === 'needs_attention' && !d.neverContacted,
-    ),
+    hot: counts.hot > 0,
+    nurture: counts.nurture > 0,
+    watch: counts.watch > 0,
+    // Needs Attention as a card aggregates contacted-but-overdue clients AND
+    // the First Touch backlog, so it stays enabled if either exists.
+    needsAttention:
+      counts.needsAttention > 0 || neverContacted.length > 0,
   };
 
-  function findNeedsAttentionTarget(): string | null {
+  function scrollToFirstTouch() {
+    const el = document.getElementById('first-touch-section');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleCategoryClick(cat: Category) {
+    // 1. Today has a section for this category → scroll to it.
+    if (grouped[cat].length > 0) {
+      scrollToSection(sectionId(cat));
+      return;
+    }
+    // 2. The First Touch backlog has a client of this category → scroll there.
+    if (neverContacted.some((d) => d.category === cat)) {
+      scrollToFirstTouch();
+      return;
+    }
+    // 3. Fall back to Pipeline.
+    navigate('#/pipeline');
+  }
+
+  function handleNeedsAttentionClick() {
+    // 1. Prefer a Today section that has a contacted-but-overdue client.
     for (const cat of CATEGORIES) {
       if (
         grouped[cat].some(
           (d) => d.followUpStatus === 'needs_attention' && !d.neverContacted,
         )
       ) {
-        return sectionId(cat);
+        scrollToSection(sectionId(cat));
+        return;
       }
     }
-    return null;
+    // 2. Otherwise, never-contacted are the unattended work — scroll there.
+    if (neverContacted.length > 0) {
+      scrollToFirstTouch();
+      return;
+    }
+    // 3. Fall back to Pipeline.
+    navigate('#/pipeline');
   }
 
   return (
@@ -159,7 +191,7 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
           type="button"
           className="today-summary-card today-summary-card--hot"
           disabled={!canClick.hot}
-          onClick={() => scrollToSection(sectionId('hot'))}
+          onClick={() => handleCategoryClick('hot')}
         >
           <span className="today-summary-count">{counts.hot}</span>
           <span className="today-summary-label">Hot</span>
@@ -168,7 +200,7 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
           type="button"
           className="today-summary-card today-summary-card--nurture"
           disabled={!canClick.nurture}
-          onClick={() => scrollToSection(sectionId('nurture'))}
+          onClick={() => handleCategoryClick('nurture')}
         >
           <span className="today-summary-count">{counts.nurture}</span>
           <span className="today-summary-label">Nurture</span>
@@ -177,7 +209,7 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
           type="button"
           className="today-summary-card today-summary-card--watch"
           disabled={!canClick.watch}
-          onClick={() => scrollToSection(sectionId('watch'))}
+          onClick={() => handleCategoryClick('watch')}
         >
           <span className="today-summary-count">{counts.watch}</span>
           <span className="today-summary-label">Watch</span>
@@ -186,21 +218,47 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
           type="button"
           className="today-summary-card today-summary-card--attention"
           disabled={!canClick.needsAttention}
-          onClick={() => scrollToSection(findNeedsAttentionTarget())}
+          onClick={handleNeedsAttentionClick}
         >
           <span className="today-summary-count">{counts.needsAttention}</span>
           <span className="today-summary-label">Needs Attention</span>
         </button>
       </div>
 
+      {hasAny && (
+        <section className="priority-briefing">
+          <h3 className="priority-briefing-title">Badger Says</h3>
+          {briefing.length === 0 ? (
+            <p className="priority-briefing-calm">{CALM_BRIEFING_MESSAGE}</p>
+          ) : (
+            <div className="priority-briefing-list">
+              {briefing.map((d) => (
+                <InsightPanel
+                  key={d.id}
+                  insight={d.insight}
+                  dealName={d.clientName}
+                  onClick={() => onSelectDeal(d.id)}
+                  variant="full"
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {neverContacted.length > 0 && (
-        <section className="first-touch-section" aria-label="First Touch">
+        <section
+          id="first-touch-section"
+          className="first-touch-section"
+          aria-label="First Touch"
+        >
           <div className="first-touch-header">
             <h3 className="first-touch-title">
               First Touch <span className="first-touch-count">({neverContacted.length})</span>
             </h3>
             <p className="first-touch-caption">
-              Clients on file but never contacted. Log a touch to bring them into your cadence.
+              Clients on file but never contacted. Use <strong>Log Activity</strong> in the
+              drawer to record a touch — that removes them from this list.
             </p>
           </div>
           <div className="first-touch-list">
@@ -231,27 +289,6 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
             >
               View all {neverContacted.length} →
             </button>
-          )}
-        </section>
-      )}
-
-      {hasAny && (
-        <section className="priority-briefing">
-          <h3 className="priority-briefing-title">Badger Says</h3>
-          {briefing.length === 0 ? (
-            <p className="priority-briefing-calm">{CALM_BRIEFING_MESSAGE}</p>
-          ) : (
-            <div className="priority-briefing-list">
-              {briefing.map((d) => (
-                <InsightPanel
-                  key={d.id}
-                  insight={d.insight}
-                  dealName={d.clientName}
-                  onClick={() => onSelectDeal(d.id)}
-                  variant="full"
-                />
-              ))}
-            </div>
           )}
         </section>
       )}
