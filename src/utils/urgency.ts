@@ -96,6 +96,33 @@ export function sortForTodayView(deals: DealWithUrgency[]): DealWithUrgency[] {
     });
 }
 
+// Single source of truth for "this client is in the unattended workload."
+// Used by Today's Needs Attention summary count and its click routing.
+//
+// A client is unattended if it's active AND any of:
+//   - never contacted (lives in First Touch)
+//   - cadence-overdue by category (followUpStatus === 'needs_attention')
+//   - has a Next Step whose Due date is in the past
+//   - in Under Contract with no Next Step defined
+//   - in Under Contract with a blocker
+//
+// Stage-driven escalation is layered ON TOP of category cadence, never
+// substituted for it. This predicate does not modify Stage / Category /
+// insight semantics — it's strictly a roll-up for the summary count.
+export function isUnattended(d: DealWithUrgency, now: Date = new Date()): boolean {
+  if (d.stage === 'closed') return false;
+  if (d.neverContacted) return true;
+  if (d.followUpStatus === 'needs_attention') return true;
+  if (d.nextStepDue && new Date(d.nextStepDue).getTime() < now.getTime()) {
+    return true;
+  }
+  if (d.stage === 'under_contract') {
+    if (!d.nextStep?.trim()) return true;
+    if (d.blocker?.trim()) return true;
+  }
+  return false;
+}
+
 // Sort within a single category bucket for Today view
 // needs_attention first, then daysSinceContact desc, then updatedAt desc
 export function sortByAttentionWithinCategory(deals: DealWithUrgency[]): DealWithUrgency[] {

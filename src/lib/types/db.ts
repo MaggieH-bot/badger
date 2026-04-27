@@ -79,7 +79,11 @@ export interface DocumentRow {
   title: string;
   type: DocumentType;
   author: Assignee;
-  content: string;
+  content: string | null;
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  file_mime: string | null;
   created_at: string;
   updated_at: string;
 }

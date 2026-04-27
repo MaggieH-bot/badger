@@ -585,6 +585,8 @@ body {
   align-items: center;
   gap: 2px;
   /* button-reset for clickability */
+  appearance: none;
+  -webkit-appearance: none;
   font-family: inherit;
   font-size: inherit;
   color: inherit;
@@ -633,6 +635,8 @@ body {
   font-weight: 800;
   line-height: 1;
   color: var(--text-primary);
+  /* Force every tap inside the card to register on the parent button. */
+  pointer-events: none;
 }
 
 .today-summary-label {
@@ -641,6 +645,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-primary);
+  pointer-events: none;
 }
 
 /* ============================================
@@ -2651,4 +2656,36 @@ body {
   background: var(--bg-elevated);
   color: var(--text-secondary);
   border-color: var(--border-strong);
+}
+
+/* ============================================
+   Document file attachment
+   ============================================ */
+
+.doc-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.doc-file-row .btn-link {
+  flex-shrink: 0;
 }

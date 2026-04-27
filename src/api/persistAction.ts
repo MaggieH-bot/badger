@@ -67,7 +67,7 @@ export async function persistAction(
       return;
 
     case 'DELETE_DOCUMENT':
-      await deleteDocument(action.documentId);
+      await deleteDocument(action.documentId, action.filePath ?? null);
       return;
   }
 }

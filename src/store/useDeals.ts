@@ -27,7 +27,7 @@ type DealsAction =
   | { type: 'DELETE_NOTE'; dealId: string; noteId: string }
   | { type: 'ADD_DOCUMENT'; dealId: string; document: Document }
   | { type: 'UPDATE_DOCUMENT'; dealId: string; document: Document }
-  | { type: 'DELETE_DOCUMENT'; dealId: string; documentId: string };
+  | { type: 'DELETE_DOCUMENT'; dealId: string; documentId: string; filePath?: string };
 
 // --- Reducer (in-memory only; persistence is handled by the dispatch wrapper) ---
 

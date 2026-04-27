@@ -81,7 +81,13 @@ export interface Document {
   author: Assignee;
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
-  content: string; // plain text only
+  // Free-form text notes. Optional now that documents may be file-only.
+  content?: string;
+  // Attached file metadata (Supabase Storage). All four populated together.
+  filePath?: string;  // path inside the client-documents bucket
+  fileName?: string;  // original filename for display
+  fileSize?: number;  // bytes
+  fileMime?: string;  // currently always 'application/pdf'
 }
 
 // --- Core entity ---

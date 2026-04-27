@@ -37,7 +37,11 @@ export function rowToDocument(row: DocumentRow): Document {
     title: row.title,
     type: row.type,
     author: row.author,
-    content: row.content,
+    content: row.content ?? undefined,
+    filePath: row.file_path ?? undefined,
+    fileName: row.file_name ?? undefined,
+    fileSize: row.file_size ?? undefined,
+    fileMime: row.file_mime ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -215,17 +219,28 @@ export function documentToInsertRow(
     title: doc.title,
     type: doc.type,
     author: doc.author,
-    content: doc.content,
+    content: doc.content ?? null,
+    file_path: doc.filePath ?? null,
+    file_name: doc.fileName ?? null,
+    file_size: doc.fileSize ?? null,
+    file_mime: doc.fileMime ?? null,
   };
 }
 
 export function documentToUpdateRow(
   doc: Document,
-): Pick<DocumentRow, 'title' | 'type' | 'author' | 'content'> {
+): Pick<
+  DocumentRow,
+  'title' | 'type' | 'author' | 'content' | 'file_path' | 'file_name' | 'file_size' | 'file_mime'
+> {
   return {
     title: doc.title,
     type: doc.type,
     author: doc.author,
-    content: doc.content,
+    content: doc.content ?? null,
+    file_path: doc.filePath ?? null,
+    file_name: doc.fileName ?? null,
+    file_size: doc.fileSize ?? null,
+    file_mime: doc.fileMime ?? null,
   };
 }

@@ -4,7 +4,11 @@ import { CATEGORIES, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../cons
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
-import { computeUrgency, sortByAttentionWithinCategory } from '../../utils/urgency';
+import {
+  computeUrgency,
+  isUnattended,
+  sortByAttentionWithinCategory,
+} from '../../utils/urgency';
 import {
   computeInsight,
   sortByInsightPriority,
@@ -112,14 +116,15 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   }
 
   // Summary counts use ALL active filtered deals (unchanged for category totals).
-  // Needs Attention count excludes never-contacted to mirror what the section shows.
+  // Needs Attention is the total unattended workload — never-contacted clients,
+  // cadence-overdue clients, overdue Next Step Due, Under Contract without a
+  // Next Step or with a blocker. Centralized via the isUnattended predicate so
+  // the count and the click target use the same definition.
   const counts = {
     hot: withUrgency.filter((d) => d.category === 'hot').length,
     nurture: withUrgency.filter((d) => d.category === 'nurture').length,
     watch: withUrgency.filter((d) => d.category === 'watch').length,
-    needsAttention: withUrgency.filter(
-      (d) => d.followUpStatus === 'needs_attention' && !d.neverContacted,
-    ).length,
+    needsAttention: withUrgency.filter((d) => isUnattended(d)).length,
   };
 
   const hasAny = withUrgency.length > 0;
@@ -133,10 +138,8 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
     hot: counts.hot > 0,
     nurture: counts.nurture > 0,
     watch: counts.watch > 0,
-    // Needs Attention as a card aggregates contacted-but-overdue clients AND
-    // the First Touch backlog, so it stays enabled if either exists.
-    needsAttention:
-      counts.needsAttention > 0 || neverContacted.length > 0,
+    // counts.needsAttention already includes First Touch via isUnattended.
+    needsAttention: counts.needsAttention > 0,
   };
 
   function scrollToFirstTouch() {
@@ -160,18 +163,16 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   }
 
   function handleNeedsAttentionClick() {
-    // 1. Prefer a Today section that has a contacted-but-overdue client.
+    // 1. Prefer a Today section that already contains an unattended (and
+    //    contacted) client — never-contacted lives in First Touch, so we
+    //    skip them in this lookup.
     for (const cat of CATEGORIES) {
-      if (
-        grouped[cat].some(
-          (d) => d.followUpStatus === 'needs_attention' && !d.neverContacted,
-        )
-      ) {
+      if (grouped[cat].some((d) => !d.neverContacted && isUnattended(d))) {
         scrollToSection(sectionId(cat));
         return;
       }
     }
-    // 2. Otherwise, never-contacted are the unattended work — scroll there.
+    // 2. Otherwise, the First Touch backlog IS the unattended work — go there.
     if (neverContacted.length > 0) {
       scrollToFirstTouch();
       return;
