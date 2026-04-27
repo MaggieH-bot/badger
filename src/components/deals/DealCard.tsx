@@ -61,6 +61,14 @@ export function DealCard({ deal, onClick }: DealCardProps) {
     >
       <div className="deal-card-header">
         <span className="deal-card-name">{deal.clientName}</span>
+        {deal.opportunityType && (
+          <span
+            className={`opp-type-pill opp-type-pill--${deal.opportunityType}`}
+            aria-label={`Opportunity type: ${OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}`}
+          >
+            {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
+          </span>
+        )}
         {showAttention && (
           <span className="attention-pill">Needs Attn</span>
         )}
@@ -69,9 +77,6 @@ export function DealCard({ deal, onClick }: DealCardProps) {
         <div className="deal-card-detail">{deal.address}</div>
       )}
       <div className="deal-card-meta">
-        {deal.opportunityType && (
-          <span>{OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}</span>
-        )}
         {deal.probability !== undefined && (
           <span>{deal.probability}%</span>
         )}

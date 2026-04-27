@@ -2608,3 +2608,47 @@ body {
 .phase-a-both-note strong {
   color: var(--accent);
 }
+
+/* ============================================
+   Opportunity Type pill (Buy / Sell / Both / Rent)
+   Used in deal card headers and the Pipeline table.
+   Distinct from category-badge so the two read independently.
+   ============================================ */
+
+.opp-type-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px var(--space-sm);
+  border-radius: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+
+.opp-type-pill--buy {
+  background: var(--accent-muted);
+  color: var(--accent);
+  border-color: rgba(95, 161, 216, 0.32);
+}
+
+.opp-type-pill--sell {
+  background: var(--on-track-bg);
+  color: var(--on-track);
+  border-color: rgba(125, 161, 111, 0.32);
+}
+
+.opp-type-pill--both {
+  background: var(--warming-bg);
+  color: var(--warming);
+  border-color: rgba(216, 160, 80, 0.32);
+}
+
+.opp-type-pill--rent {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}

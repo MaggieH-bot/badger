@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { DealWithUrgency, Category } from '../../types';
-import { STAGE_LABELS, CATEGORY_LABELS } from '../../constants/pipeline';
+import { STAGE_LABELS, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { computeUrgency } from '../../utils/urgency';
@@ -18,6 +18,7 @@ type SortKey =
   | 'clientName'
   | 'category'
   | 'address'
+  | 'opportunityType'
   | 'stage'
   | 'assignedTo'
   | 'followUp'
@@ -30,6 +31,7 @@ type SortDir = 'asc' | 'desc';
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'clientName', label: 'Client' },
   { key: 'category', label: 'Category' },
+  { key: 'opportunityType', label: 'Type' },
   { key: 'stage', label: 'Stage' },
   { key: 'assignedTo', label: 'Assigned' },
   { key: 'followUp', label: 'Follow-up' },
@@ -121,6 +123,9 @@ function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: 
       break;
     case 'address':
       cmp = (a.address ?? '').localeCompare(b.address ?? '');
+      break;
+    case 'opportunityType':
+      cmp = (a.opportunityType ?? '').localeCompare(b.opportunityType ?? '');
       break;
     case 'stage':
       cmp = STAGE_LABELS[a.stage].localeCompare(STAGE_LABELS[b.stage]);
@@ -247,6 +252,17 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
                 <span className={`category-badge category-badge--${deal.category}`}>
                   {CATEGORY_LABELS[deal.category]}
                 </span>
+              </td>
+              <td className="deals-table-td">
+                {deal.opportunityType ? (
+                  <span
+                    className={`opp-type-pill opp-type-pill--${deal.opportunityType}`}
+                  >
+                    {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
+                  </span>
+                ) : (
+                  <span className="followup-muted">—</span>
+                )}
               </td>
               <td className="deals-table-td">{STAGE_LABELS[deal.stage]}</td>
               <td className="deals-table-td">{deal.assignedTo}</td>
