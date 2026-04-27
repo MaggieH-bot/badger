@@ -35,14 +35,6 @@ function sectionId(cat: Category): string {
   return `today-section-${cat}`;
 }
 
-function scrollToSection(id: string | null) {
-  if (!id) return;
-  const el = document.getElementById(id);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
 export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
@@ -142,20 +134,36 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
     needsAttention: counts.needsAttention > 0,
   };
 
-  function scrollToFirstTouch() {
-    const el = document.getElementById('first-touch-section');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Brief visual flash so summary-card clicks always have a visible result —
+  // even when the target section is already in viewport and no scroll happens.
+  // Direct DOM manipulation is intentional here: it makes the animation
+  // re-trigger on repeat clicks without state-key gymnastics.
+  function flashElement(elementId: string) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.classList.remove('flash-target');
+    // Force reflow so the next add re-runs the animation.
+    void el.offsetWidth;
+    el.classList.add('flash-target');
+    window.setTimeout(() => el.classList.remove('flash-target'), 1500);
+  }
+
+  function scrollAndFlash(elementId: string): boolean {
+    const el = document.getElementById(elementId);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    flashElement(elementId);
+    return true;
   }
 
   function handleCategoryClick(cat: Category) {
-    // 1. Today has a section for this category → scroll to it.
-    if (grouped[cat].length > 0) {
-      scrollToSection(sectionId(cat));
-      return;
-    }
-    // 2. The First Touch backlog has a client of this category → scroll there.
-    if (neverContacted.some((d) => d.category === cat)) {
-      scrollToFirstTouch();
+    // 1. Today has a section for this category → scroll + flash it.
+    if (grouped[cat].length > 0 && scrollAndFlash(sectionId(cat))) return;
+    // 2. The First Touch backlog has a client of this category → scroll + flash it.
+    if (
+      neverContacted.some((d) => d.category === cat) &&
+      scrollAndFlash('first-touch-section')
+    ) {
       return;
     }
     // 3. Fall back to Pipeline.
@@ -164,17 +172,14 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
 
   function handleNeedsAttentionClick() {
     // 1. Prefer a Today section that already contains an unattended (and
-    //    contacted) client — never-contacted lives in First Touch, so we
-    //    skip them in this lookup.
+    //    contacted) client.
     for (const cat of CATEGORIES) {
       if (grouped[cat].some((d) => !d.neverContacted && isUnattended(d))) {
-        scrollToSection(sectionId(cat));
-        return;
+        if (scrollAndFlash(sectionId(cat))) return;
       }
     }
     // 2. Otherwise, the First Touch backlog IS the unattended work — go there.
-    if (neverContacted.length > 0) {
-      scrollToFirstTouch();
+    if (neverContacted.length > 0 && scrollAndFlash('first-touch-section')) {
       return;
     }
     // 3. Fall back to Pipeline.

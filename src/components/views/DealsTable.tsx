@@ -6,12 +6,14 @@ import { useUIPreferences } from '../../store/useUIPreferences';
 import { computeUrgency } from '../../utils/urgency';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
 import { DealCard } from '../deals/DealCard';
+import { matchesSearch } from '../../utils/search';
 
 export type DealsTableMode = 'pipeline' | 'closed';
 
 interface DealsTableProps {
   mode: DealsTableMode;
   onSelectDeal: (dealId: string) => void;
+  searchQuery?: string;
 }
 
 type SortKey =
@@ -150,7 +152,7 @@ function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: 
   return dir === 'asc' ? cmp : -cmp;
 }
 
-export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
+export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
   const [sortKey, setSortKey] = useState<SortKey>('daysSinceContact');
@@ -172,7 +174,14 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
 
   const hiddenByTeamFilter = stageMatched.length - filtered.length;
 
-  const withUrgency = filtered.map((d) => computeUrgency(d));
+  // Search overlays on top of the team filter without replacing it.
+  const searchFiltered = searchQuery
+    ? filtered.filter((d) => matchesSearch(d, searchQuery))
+    : filtered;
+  const isSearching = searchQuery.trim().length > 0;
+  const hiddenBySearch = filtered.length - searchFiltered.length;
+
+  const withUrgency = searchFiltered.map((d) => computeUrgency(d));
 
   const sorted = useMemo(
     () => [...withUrgency].sort((a, b) => compareDeal(a, b, sortKey, sortDir)),
@@ -199,7 +208,12 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
       <>
         <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
         <div className="empty-state">
-          {mode === 'pipeline' ? (
+          {isSearching && hiddenBySearch > 0 ? (
+            <>
+              <p>No clients found.</p>
+              <p>No match for "{searchQuery.trim()}". Clear the search to see all clients.</p>
+            </>
+          ) : mode === 'pipeline' ? (
             <>
               <p>No active clients match the current filter.</p>
               <p>Click "+ Add Client" to create a client, or change the team filter.</p>

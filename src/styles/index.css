@@ -2689,3 +2689,75 @@ body {
 .doc-file-row .btn-link {
   flex-shrink: 0;
 }
+
+/* ============================================
+   Flash target — short-lived highlight on summary-card click
+   ============================================ */
+
+.flash-target {
+  animation: badger-flash 1.5s ease-out;
+  border-radius: var(--radius-lg);
+}
+
+@keyframes badger-flash {
+  0% {
+    box-shadow: 0 0 0 3px var(--accent), 0 0 24px var(--accent-muted);
+  }
+  60% {
+    box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent-muted);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent, 0 0 0 transparent;
+  }
+}
+
+/* ============================================
+   Pipeline search
+   ============================================ */
+
+.pipeline-search {
+  position: relative;
+  margin-bottom: var(--space-md);
+  max-width: 480px;
+}
+
+.pipeline-search-input {
+  width: 100%;
+  padding: 8px 36px 8px 14px;
+  font-size: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.pipeline-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.pipeline-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.pipeline-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.pipeline-search-clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}

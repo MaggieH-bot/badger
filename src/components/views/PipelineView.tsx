@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { PipelineViewMode } from '../../types';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { PipelineBoardView } from './PipelineBoardView';
@@ -15,6 +16,8 @@ const VIEW_MODES: { mode: PipelineViewMode; label: string }[] = [
 export function PipelineView({ onSelectDeal }: PipelineViewProps) {
   const { preferences, dispatch } = useUIPreferences();
   const mode = preferences.pipelineViewMode;
+  // Search is session-scoped (not persisted) — clearing the page resets it.
+  const [search, setSearch] = useState('');
 
   return (
     <div className="view">
@@ -38,10 +41,31 @@ export function PipelineView({ onSelectDeal }: PipelineViewProps) {
         </div>
       </div>
 
+      <div className="pipeline-search">
+        <input
+          type="text"
+          className="pipeline-search-input"
+          placeholder="Search clients…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search clients"
+        />
+        {search && (
+          <button
+            type="button"
+            className="pipeline-search-clear"
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
       {mode === 'table' ? (
-        <DealsTable mode="pipeline" onSelectDeal={onSelectDeal} />
+        <DealsTable mode="pipeline" onSelectDeal={onSelectDeal} searchQuery={search} />
       ) : (
-        <PipelineBoardView onSelectDeal={onSelectDeal} />
+        <PipelineBoardView onSelectDeal={onSelectDeal} searchQuery={search} />
       )}
     </div>
   );

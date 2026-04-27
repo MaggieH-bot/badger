@@ -43,6 +43,7 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<{ title?: string; body?: string; file?: string }>({});
+  const [flash, setFlash] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   function reset() {
@@ -152,13 +153,22 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
 
     reset();
     setOpen(false);
+    setFlash(file ? 'Document uploaded.' : 'Document saved.');
+    window.setTimeout(() => setFlash(null), 3000);
   }
 
   if (!open) {
     return (
-      <button type="button" className="btn btn--secondary" onClick={() => setOpen(true)}>
-        + Add Document
-      </button>
+      <>
+        <button type="button" className="btn btn--secondary" onClick={() => setOpen(true)}>
+          + Add Document
+        </button>
+        {flash && (
+          <span className="form-saved-flash" role="status" style={{ marginLeft: 12 }}>
+            {flash}
+          </span>
+        )}
+      </>
     );
   }
 

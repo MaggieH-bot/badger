@@ -21,12 +21,13 @@ function formatTimestamp(iso: string): string {
 
 // --- Log Activity form ---
 
-function LogActivityForm({ dealId }: { dealId: string }) {
+function LogActivityForm({ deal }: { deal: Deal }) {
   const { dispatch } = useDeals();
   const [method, setMethod] = useState<ContactMethod>('call');
   const [author, setAuthor] = useState<Assignee>('You');
   const [summary, setSummary] = useState('');
   const [error, setError] = useState('');
+  const [flash, setFlash] = useState<string | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,10 +37,14 @@ function LogActivityForm({ dealId }: { dealId: string }) {
       return;
     }
 
+    // Capture First Touch state BEFORE dispatch so the post-dispatch flash
+    // message can mention the transition.
+    const wasFirstTouch = !deal.lastContact;
+
     const now = new Date().toISOString();
     dispatch({
       type: 'ADD_CONTACT_LOG',
-      dealId,
+      dealId: deal.id,
       entry: {
         id: generateId(),
         timestamp: now,
@@ -51,6 +56,12 @@ function LogActivityForm({ dealId }: { dealId: string }) {
 
     setSummary('');
     setError('');
+    setFlash(
+      wasFirstTouch
+        ? 'Activity logged. Client moved out of First Touch.'
+        : 'Activity logged.',
+    );
+    window.setTimeout(() => setFlash(null), 3000);
   }
 
   return (
@@ -99,9 +110,16 @@ function LogActivityForm({ dealId }: { dealId: string }) {
         />
         {error && <span className="form-error">{error}</span>}
       </div>
-      <button type="submit" className="btn btn--primary">
-        Save Activity
-      </button>
+      <div className="form-actions">
+        <button type="submit" className="btn btn--primary">
+          Save Activity
+        </button>
+        {flash && (
+          <span className="form-saved-flash" role="status">
+            {flash}
+          </span>
+        )}
+      </div>
     </form>
   );
 }
@@ -426,7 +444,7 @@ export function ActivityTab({ deal }: ActivityTabProps) {
           Records a touch with the client (call, text, email, meeting). Updates
           their last-contact date and removes them from First Touch.
         </p>
-        <LogActivityForm dealId={deal.id} />
+        <LogActivityForm deal={deal} />
         {logEntries.length === 0 ? (
           <p className="empty-state empty-state--spaced">No activity logged yet.</p>
         ) : (

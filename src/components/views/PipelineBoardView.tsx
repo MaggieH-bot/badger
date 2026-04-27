@@ -4,12 +4,17 @@ import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { computeUrgency } from '../../utils/urgency';
 import { DealCard } from '../deals/DealCard';
+import { matchesSearch } from '../../utils/search';
 
 interface PipelineBoardViewProps {
   onSelectDeal: (dealId: string) => void;
+  searchQuery?: string;
 }
 
-export function PipelineBoardView({ onSelectDeal }: PipelineBoardViewProps) {
+export function PipelineBoardView({
+  onSelectDeal,
+  searchQuery = '',
+}: PipelineBoardViewProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
 
@@ -21,7 +26,13 @@ export function PipelineBoardView({ onSelectDeal }: PipelineBoardViewProps) {
         d.assignedTo === preferences.activeTeamFilter),
   );
 
-  const withUrgency = filtered.map((d) => computeUrgency(d));
+  // Search overlays on top.
+  const searchFiltered = searchQuery
+    ? filtered.filter((d) => matchesSearch(d, searchQuery))
+    : filtered;
+  const isSearching = searchQuery.trim().length > 0;
+
+  const withUrgency = searchFiltered.map((d) => computeUrgency(d));
 
   const grouped: Record<Stage, DealWithUrgency[]> = {
     lead: [],
@@ -32,6 +43,15 @@ export function PipelineBoardView({ onSelectDeal }: PipelineBoardViewProps) {
   };
   for (const deal of withUrgency) {
     grouped[deal.stage].push(deal);
+  }
+
+  if (isSearching && searchFiltered.length === 0) {
+    return (
+      <div className="empty-state">
+        <p>No clients found.</p>
+        <p>No match for "{searchQuery.trim()}". Clear the search to see all clients.</p>
+      </div>
+    );
   }
 
   return (
