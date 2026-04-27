@@ -9,13 +9,35 @@ interface DealCardProps {
   onClick: (dealId: string) => void;
 }
 
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price);
+function formatPriceShort(price: number): string {
+  if (!Number.isFinite(price) || price <= 0) return '';
+  if (price >= 1_000_000) {
+    return `$${(price / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+  if (price >= 1_000) {
+    return `$${Math.round(price / 1_000)}K`;
+  }
+  return `$${price}`;
+}
+
+// Card-level price summary, context-aware per Type × Stage.
+function priceSummary(deal: DealWithUrgency): string | null {
+  if (deal.stage === 'closed' && deal.closedPrice !== undefined) {
+    return formatPriceShort(deal.closedPrice);
+  }
+  if (deal.listPrice !== undefined) return formatPriceShort(deal.listPrice);
+  if (deal.priceRangeLow !== undefined || deal.priceRangeHigh !== undefined) {
+    const lo = deal.priceRangeLow !== undefined ? formatPriceShort(deal.priceRangeLow) : '';
+    const hi = deal.priceRangeHigh !== undefined ? formatPriceShort(deal.priceRangeHigh) : '';
+    if (lo && hi) return `${lo}–${hi}`;
+    return lo || hi || null;
+  }
+  if (deal.price !== undefined) return formatPriceShort(deal.price);
+  return null;
+}
+
+function dueLabel(due: string): string {
+  return new Date(due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function DealCard({ deal, onClick }: DealCardProps) {
@@ -29,6 +51,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
 
   const isClosed = deal.stage === 'closed';
   const showAttention = deal.followUpStatus === 'needs_attention';
+  const price = priceSummary(deal);
 
   return (
     <button
@@ -55,12 +78,15 @@ export function DealCard({ deal, onClick }: DealCardProps) {
         <span>{STAGE_LABELS[deal.stage]}</span>
         <span>{deal.assignedTo}</span>
         <span>{daysLabel}</span>
-        {deal.price !== undefined && (
-          <span>{formatPrice(deal.price)}</span>
-        )}
+        {price && <span>{price}</span>}
       </div>
-      {deal.nextAction && (
-        <div className="deal-card-next">Next: {deal.nextAction}</div>
+      {deal.nextStep && (
+        <div className="deal-card-next">
+          Next: {deal.nextStep}
+          {deal.nextStepDue && (
+            <span className="deal-card-due"> — due {dueLabel(deal.nextStepDue)}</span>
+          )}
+        </div>
       )}
     </button>
   );

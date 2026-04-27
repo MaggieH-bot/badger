@@ -8,6 +8,7 @@ import type {
   OpportunityType,
   ContactMethod,
   DocumentType,
+  Sequencing,
 } from '../../types';
 
 export interface DealRow {
@@ -23,13 +24,30 @@ export interface DealRow {
   address: string | null;
   phone: string | null;
   email: string | null;
+
+  // Plan
+  next_step: string | null;
+  next_step_due: string | null;
+
+  // Price family — context-aware. The legacy single `price` column is kept
+  // readable for backward-compat (older rows) but the app writes typed columns.
+  list_price: number | null;
+  price_range_low: number | null;
+  price_range_high: number | null;
+  closed_price: number | null;
+  /** @deprecated read-only legacy column */
   price: number | null;
-  next_action: string | null;
+
+  // Both-only
+  sequencing: Sequencing | null;
+
+  // Context
   target_timeframe: string | null;
   area_of_interest: string | null;
   motivation: string | null;
   blocker: string | null;
   lead_source: string | null;
+
   last_contact: string | null;
   created_at: string;
   updated_at: string;

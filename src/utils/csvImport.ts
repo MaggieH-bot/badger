@@ -19,7 +19,8 @@ export type FieldKey =
   | 'probability'
   | 'stage'
   | 'lastContact'
-  | 'nextAction'
+  | 'nextStep'
+  | 'nextStepDue'
   | 'comments'
   | 'address'
   | 'phone'
@@ -168,11 +169,16 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
   'last contact': 'lastContact',
   'last contacted': 'lastContact',
   'last touch': 'lastContact',
-  // nextAction
-  'next action': 'nextAction',
-  'next step': 'nextAction',
-  next: 'nextAction',
-  todo: 'nextAction',
+  // nextStep (aliases include the legacy "Next Action" header)
+  'next step': 'nextStep',
+  'next action': 'nextStep',
+  next: 'nextStep',
+  todo: 'nextStep',
+  // nextStepDue
+  'next step due': 'nextStepDue',
+  'next step date': 'nextStepDue',
+  'due date': 'nextStepDue',
+  due: 'nextStepDue',
   // comments (deliberately NOT "notes")
   comments: 'comments',
   comment: 'comments',
@@ -265,18 +271,37 @@ const OPP_TYPE_MAP: Record<string, OpportunityType> = {
   rental: 'rent',
 };
 
-// Stage map: only clear values. NO won/lost/dead/dropped.
+// Stage map: V1 vocabulary plus legacy aliases.
+//   prospect → lead (legacy state, folded into Lead)
+//   active   → defaults to listing for sell/both, active_buyer for buy
+//             (resolved per-row in importStageWithType below)
+//   closing  → under_contract (legacy state, folded into Under Contract)
 const STAGE_MAP: Record<string, Stage> = {
   lead: 'lead',
-  prospect: 'prospect',
-  active: 'active',
+  prospect: 'lead',
+  listing: 'listing',
+  list: 'listing',
+  'active buyer': 'active_buyer',
+  active_buyer: 'active_buyer',
   'under contract': 'under_contract',
   under_contract: 'under_contract',
-  closing: 'closing',
+  closing: 'under_contract',
   closed: 'closed',
   completed: 'closed',
   complete: 'closed',
 };
+
+// 'active' is intentionally not in STAGE_MAP because it depends on Opportunity
+// Type. Resolve it after we know the type.
+function resolveLegacyActiveStage(
+  rawStage: string,
+  opportunityType: OpportunityType | undefined,
+): Stage | null {
+  if (rawStage.trim().toLowerCase() !== 'active') return null;
+  if (opportunityType === 'buy' || opportunityType === 'rent') return 'active_buyer';
+  if (opportunityType === 'sell' || opportunityType === 'both') return 'listing';
+  return 'lead'; // type unknown → safest fallback
+}
 
 const ASSIGNEE_MAP: Record<string, Assignee> = {
   you: 'You',
@@ -374,7 +399,7 @@ function deriveCategoryFromLegacy(
   stage: Stage,
   probability: number | undefined,
 ): Category {
-  if (stage === 'under_contract' || stage === 'closing') return 'hot';
+  if (stage === 'under_contract') return 'hot';
   if (typeof probability === 'number') {
     if (probability >= 80) return 'hot';
     if (probability >= 40) return 'nurture';
@@ -420,9 +445,22 @@ function parseRow(
     };
   }
 
-  // Stage (defaulted, validated)
+  // Opportunity type (resolved early so we can disambiguate legacy 'active' stages)
+  const oppRaw = getRawValue(row, 'opportunityType', fieldByCol);
+  const oppResult = normalizeOpportunityType(oppRaw);
+  const opportunityType = oppResult.value;
+  if (!oppResult.recognized) {
+    warnings.push(
+      `Opportunity Type "${oppRaw.trim()}" not recognized → omitted. (Use Buy, Sell, Both, or Rent.)`,
+    );
+  }
+
+  // Stage (defaulted, validated). Legacy 'active' resolves per-type.
   const stageRaw = getRawValue(row, 'stage', fieldByCol);
-  const stageResult = normalizeStage(stageRaw);
+  const legacyActive = resolveLegacyActiveStage(stageRaw, opportunityType);
+  const stageResult = legacyActive
+    ? { recognized: true as const, value: legacyActive }
+    : normalizeStage(stageRaw);
   let stage: Stage;
   if (stageResult.recognized) {
     stage = stageResult.value ?? 'lead';
@@ -448,7 +486,7 @@ function parseRow(
     category = catResult.value ?? deriveCategoryFromLegacy(stage, probability);
     if (!catResult.value) {
       // empty — only warn if no probability/stage hint either
-      if (probability === undefined && stage !== 'under_contract' && stage !== 'closing') {
+      if (probability === undefined && stage !== 'under_contract') {
         warnings.push(`Category missing → defaulted to ${labelOf(category)}.`);
       }
     }
@@ -456,16 +494,6 @@ function parseRow(
     category = deriveCategoryFromLegacy(stage, probability);
     warnings.push(
       `Category "${catRaw.trim()}" not recognized → defaulted to ${labelOf(category)}. (Use Hot, Nurture, or Watch.)`,
-    );
-  }
-
-  // Opportunity type
-  const oppRaw = getRawValue(row, 'opportunityType', fieldByCol);
-  const oppResult = normalizeOpportunityType(oppRaw);
-  const opportunityType = oppResult.value;
-  if (!oppResult.recognized) {
-    warnings.push(
-      `Opportunity Type "${oppRaw.trim()}" not recognized → omitted. (Use Buy, Sell, Both, or Rent.)`,
     );
   }
 
@@ -505,7 +533,7 @@ function parseRow(
 
   // Free text fields
   const comments = normalizeText(getRawValue(row, 'comments', fieldByCol)) || undefined;
-  const nextAction = normalizeText(getRawValue(row, 'nextAction', fieldByCol)) || undefined;
+  const nextStep = normalizeText(getRawValue(row, 'nextStep', fieldByCol)) || undefined;
   const address = normalizeText(getRawValue(row, 'address', fieldByCol)) || undefined;
   const phone = normalizeText(getRawValue(row, 'phone', fieldByCol)) || undefined;
   const email = normalizeText(getRawValue(row, 'email', fieldByCol)) || undefined;
@@ -514,6 +542,40 @@ function parseRow(
   const motivation = normalizeText(getRawValue(row, 'motivation', fieldByCol)) || undefined;
   const blocker = normalizeText(getRawValue(row, 'blocker', fieldByCol)) || undefined;
   const leadSource = normalizeText(getRawValue(row, 'leadSource', fieldByCol)) || undefined;
+
+  // Next Step Due — optional date.
+  const dueRaw = getRawValue(row, 'nextStepDue', fieldByCol);
+  const dueResult = dueRaw ? normalizeDate(dueRaw) : { iso: null, recognized: true };
+  let nextStepDue: string | undefined;
+  if (dueResult.recognized) {
+    nextStepDue = dueResult.iso ?? undefined;
+  } else {
+    nextStepDue = undefined;
+    warnings.push(
+      `Next Step Due "${dueRaw.trim()}" is not a recognizable date → omitted.`,
+    );
+  }
+
+  // Route the imported single Price into the right typed column based on
+  // Type × Stage. Buyer ranges aren't reconstructable from one number, so a
+  // buyer's CSV price is intentionally NOT written to price_range_low/high.
+  let listPrice: number | undefined;
+  let closedPrice: number | undefined;
+  if (price !== undefined) {
+    if (stage === 'closed') {
+      closedPrice = price;
+    } else if (
+      (opportunityType === 'sell' || opportunityType === 'both') &&
+      (stage === 'listing' || stage === 'under_contract')
+    ) {
+      listPrice = price;
+    } else if (opportunityType === 'buy' || opportunityType === 'rent') {
+      // Buyer single-price imports: don't guess a range; warn and drop.
+      warnings.push(
+        `Buyer-side Price "${price}" was not imported because it can't be split into a low/high range. Set Price range — low/high in the drawer.`,
+      );
+    }
+  }
 
   const deal: Deal = {
     id: generateId(),
@@ -527,8 +589,10 @@ function parseRow(
     address,
     phone,
     email,
-    price,
-    nextAction,
+    nextStep,
+    nextStepDue,
+    listPrice,
+    closedPrice,
     targetTimeframe,
     areaOfInterest,
     motivation,

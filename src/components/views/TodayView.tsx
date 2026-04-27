@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { AppRoute, Category, DealWithUrgency } from '../../types';
-import { CATEGORIES, CATEGORY_LABELS } from '../../constants/pipeline';
+import { CATEGORIES, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
@@ -19,6 +20,12 @@ interface TodayViewProps {
 }
 
 const BRIEFING_MAX = 5;
+const FIRST_TOUCH_PREVIEW = 5;
+// Never-contacted clients older than this start showing up in Badger Says
+// alongside cadence-driven follow-ups. Pressure to clean up grows over time
+// instead of staying buried in the First Touch list forever.
+const STALE_NEVER_CONTACTED_DAYS = 7;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function sectionId(cat: Category): string {
   return `today-section-${cat}`;
@@ -36,10 +43,10 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
 
-  // Stage filter first (active deals only) — used for filter-hidden count
+  // Stage filter first (active deals only) — used for filter-hidden count.
   const activeDeals = deals.filter((d) => d.stage !== 'closed');
 
-  // Then apply team filter
+  // Then apply team filter.
   const filtered = activeDeals.filter(
     (d) =>
       preferences.activeTeamFilter === 'All' ||
@@ -50,28 +57,48 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
 
   const withUrgency = filtered.map((d) => computeUrgency(d));
 
-  // Compute insights once for the whole filtered set
+  // Compute insights once for the whole filtered set.
   const withInsight: DealWithInsight[] = withUrgency.map((d) => ({
     ...d,
     insight: computeInsight(d),
   }));
 
-  // Today-worthy filter — strict cadence + late-stage exceptions only.
-  // Never-contacted deals are excluded here (surfaced via banner instead) to
-  // keep Today focused on cadence-driven follow-ups.
+  // Today-worthy: cadence-driven attention + Under Contract always surfaces
+  // (per locked rule — Stage = workflow sensitivity, not a cadence override).
+  // Never-contacted clients are surfaced via the dedicated First Touch section
+  // and only enter Badger Says if they've been on file for STALE_NEVER_CONTACTED_DAYS+.
   const todayWorthy = withInsight.filter(
     (d) =>
       (d.followUpStatus === 'needs_attention' && !d.neverContacted) ||
-      d.stage === 'under_contract' ||
-      d.stage === 'closing',
+      d.stage === 'under_contract',
   );
 
-  const neverContactedCount = withUrgency.filter((d) => d.neverContacted).length;
+  // First Touch list — sorted oldest-on-file first to put cleanup pressure on
+  // the records that have languished longest.
+  const neverContacted = withInsight
+    .filter((d) => d.neverContacted)
+    .slice()
+    .sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
 
-  // Briefing draws from the same Today-worthy set, ranked by insight priority.
-  const briefing = sortByInsightPriority(todayWorthy).slice(0, BRIEFING_MAX);
+  const firstTouchPreview = neverContacted.slice(0, FIRST_TOUCH_PREVIEW);
 
-  // Group today-worthy by category, sort within
+  // Stale never-contacted (on file for a week+) graduate into the Badger Says
+  // briefing pool — they're a real risk now, not just data hygiene.
+  // useState init runs once per mount; satisfies react-hooks/purity (no
+  // direct Date.now() call in the render body).
+  const [nowMs] = useState(() => Date.now());
+  const staleNeverContacted = neverContacted.filter(
+    (d) =>
+      (nowMs - new Date(d.createdAt).getTime()) / MS_PER_DAY >=
+      STALE_NEVER_CONTACTED_DAYS,
+  );
+
+  const briefingPool: DealWithInsight[] = [...todayWorthy, ...staleNeverContacted];
+  const briefing = sortByInsightPriority(briefingPool).slice(0, BRIEFING_MAX);
+
+  // Group today-worthy by category, sort within.
   const grouped: Record<Category, DealWithUrgency[]> = {
     hot: [],
     nurture: [],
@@ -99,7 +126,6 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
   const hasTodayWorthy = todayWorthy.length > 0;
   const populatedCategories = CATEGORIES.filter((cat) => grouped[cat].length > 0);
 
-  // Card-clickability: enabled iff a corresponding section will render on Today.
   const canClick = {
     hot: grouped.hot.length > 0,
     nurture: grouped.nurture.length > 0,
@@ -109,7 +135,6 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
     ),
   };
 
-  // Needs Attention click target: first today-section containing a needs_attention deal.
   function findNeedsAttentionTarget(): string | null {
     for (const cat of CATEGORIES) {
       if (
@@ -168,21 +193,46 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
         </button>
       </div>
 
-      {neverContactedCount > 0 && (
-        <div className="never-contacted-banner" role="status">
-          <span className="never-contacted-banner-text">
-            {neverContactedCount === 1
-              ? '1 client has no contact history logged.'
-              : `${neverContactedCount} clients have no contact history logged.`}
-          </span>
-          <button
-            type="button"
-            className="never-contacted-banner-link"
-            onClick={() => navigate('#/pipeline')}
-          >
-            Open in Pipeline →
-          </button>
-        </div>
+      {neverContacted.length > 0 && (
+        <section className="first-touch-section" aria-label="First Touch">
+          <div className="first-touch-header">
+            <h3 className="first-touch-title">
+              First Touch <span className="first-touch-count">({neverContacted.length})</span>
+            </h3>
+            <p className="first-touch-caption">
+              Clients on file but never contacted. Log a touch to bring them into your cadence.
+            </p>
+          </div>
+          <div className="first-touch-list">
+            {firstTouchPreview.map((deal) => (
+              <button
+                key={deal.id}
+                type="button"
+                className={`first-touch-row first-touch-row--${deal.category}`}
+                onClick={() => onSelectDeal(deal.id)}
+              >
+                <span className="first-touch-name">{deal.clientName}</span>
+                <span className={`category-badge category-badge--${deal.category}`}>
+                  {CATEGORY_LABELS[deal.category]}
+                </span>
+                {deal.opportunityType && (
+                  <span className="first-touch-type">
+                    {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {neverContacted.length > firstTouchPreview.length && (
+            <button
+              type="button"
+              className="first-touch-overflow"
+              onClick={() => navigate('#/pipeline')}
+            >
+              View all {neverContacted.length} →
+            </button>
+          )}
+        </section>
       )}
 
       {hasAny && (

@@ -1,12 +1,19 @@
 // --- Stage & assignee unions ---
 
+// V1 stage model. Each opportunity type uses a subset:
+//   Buy:  lead → active_buyer → under_contract → closed
+//   Sell: lead → listing → under_contract → closed
+//   Both: lead, listing (seller lane), active_buyer (buyer lane), under_contract, closed
 export type Stage =
   | 'lead'
-  | 'prospect'
-  | 'active'
+  | 'listing'
+  | 'active_buyer'
   | 'under_contract'
-  | 'closing'
   | 'closed';
+
+// Sequencing applies to opportunity_type = 'both' only — captures whether the
+// client plans to sell first, buy first, run them in parallel, or hasn't decided.
+export type Sequencing = 'sell_first' | 'buy_first' | 'parallel' | 'unknown';
 
 export type Assignee = 'You' | 'TC' | 'VA' | 'Partner';
 
@@ -97,8 +104,25 @@ export interface Deal {
   address?: string;
   phone?: string;
   email?: string;
+
+  // Plan
+  nextStep?: string;
+  nextStepDue?: string; // ISO 8601 (date or timestamp)
+
+  // Price — context-aware:
+  //   listPrice         → seller (Listing or Under Contract)
+  //   priceRangeLow/High → buyer (Active Buyer or Under Contract)
+  //   closedPrice       → terminal stage (any opportunity type)
+  //   price (legacy)    → kept readable for backward-compat; no new writes
+  listPrice?: number;
+  priceRangeLow?: number;
+  priceRangeHigh?: number;
+  closedPrice?: number;
+  /** @deprecated Pre-V1 single-price column. Read-only. */
   price?: number;
-  nextAction?: string;
+
+  // Both-only: how the client plans to sequence buy and sell sides.
+  sequencing?: Sequencing;
 
   // Additional context for smarter follow-up
   targetTimeframe?: string;

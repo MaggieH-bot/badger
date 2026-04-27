@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import type { Stage, Assignee, Category, OpportunityType } from '../../types';
+import type { Stage, Assignee, Category, OpportunityType, Sequencing } from '../../types';
 import {
-  STAGES,
   STAGE_LABELS,
   ASSIGNEES,
   CATEGORIES,
@@ -9,9 +8,19 @@ import {
   CATEGORY_DESCRIPTIONS,
   OPPORTUNITY_TYPES,
   OPPORTUNITY_TYPE_LABELS,
+  VALID_STAGES_BY_TYPE,
+  VALID_STAGES_WITHOUT_TYPE,
+  SEQUENCING_OPTIONS,
+  SEQUENCING_LABELS,
 } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { generateId } from '../../utils/ids';
+import {
+  shouldShowAddress,
+  shouldShowSellerPrice,
+  shouldShowBuyerPriceRange,
+  shouldShowClosedPrice,
+} from './fieldVisibility';
 
 interface DealFormProps {
   onClose: () => void;
@@ -27,6 +36,13 @@ function parseProbability(input: string): number | undefined {
   return rounded;
 }
 
+function parseNumber(input: string): number | undefined {
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 export function DealForm({ onClose }: DealFormProps) {
   const { dispatch } = useDeals();
 
@@ -36,11 +52,16 @@ export function DealForm({ onClose }: DealFormProps) {
   const [probability, setProbability] = useState('');
   const [stage, setStage] = useState<Stage>('lead');
   const [assignedTo, setAssignedTo] = useState<Assignee>('You');
-  const [nextAction, setNextAction] = useState('');
+  const [nextStep, setNextStep] = useState('');
+  const [nextStepDue, setNextStepDue] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [price, setPrice] = useState('');
+  const [listPrice, setListPrice] = useState('');
+  const [priceRangeLow, setPriceRangeLow] = useState('');
+  const [priceRangeHigh, setPriceRangeHigh] = useState('');
+  const [closedPrice, setClosedPrice] = useState('');
+  const [sequencing, setSequencing] = useState<Sequencing | ''>('');
   const [comments, setComments] = useState('');
   const [targetTimeframe, setTargetTimeframe] = useState('');
   const [areaOfInterest, setAreaOfInterest] = useState('');
@@ -49,6 +70,21 @@ export function DealForm({ onClose }: DealFormProps) {
   const [leadSource, setLeadSource] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
+
+  const typeOrUndef: OpportunityType | undefined = opportunityType || undefined;
+  const validStages = typeOrUndef
+    ? VALID_STAGES_BY_TYPE[typeOrUndef]
+    : VALID_STAGES_WITHOUT_TYPE;
+  // If type changes and current stage isn't valid for the new type, snap back to 'lead'.
+  if (!validStages.includes(stage)) {
+    setStage('lead');
+  }
+
+  const showAddress = shouldShowAddress(typeOrUndef, stage);
+  const showListPrice = shouldShowSellerPrice(typeOrUndef, stage);
+  const showPriceRange = shouldShowBuyerPriceRange(typeOrUndef, stage);
+  const showClosedPrice = shouldShowClosedPrice(stage);
+  const showSequencing = typeOrUndef === 'both';
 
   function clearError(field: keyof typeof errors) {
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -77,7 +113,7 @@ export function DealForm({ onClose }: DealFormProps) {
     }
 
     const now = new Date().toISOString();
-    const parsedPrice = price.trim() ? Number(price) : undefined;
+    const dueIso = nextStepDue.trim() ? new Date(nextStepDue).toISOString() : undefined;
 
     dispatch({
       type: 'ADD_DEAL',
@@ -85,18 +121,22 @@ export function DealForm({ onClose }: DealFormProps) {
         id: generateId(),
         clientName: trimmedName,
         category,
-        opportunityType: opportunityType || undefined,
+        opportunityType: typeOrUndef,
         probability: parsedProbability,
         comments: comments.trim() || undefined,
         stage,
         assignedTo,
         // lastContact intentionally omitted: missing = "never contacted".
-        // Use the Log Contact action in the drawer to record the first touch.
-        nextAction: nextAction.trim() || undefined,
-        address: address.trim() || undefined,
+        nextStep: nextStep.trim() || undefined,
+        nextStepDue: dueIso,
+        address: showAddress ? (address.trim() || undefined) : undefined,
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
-        price: parsedPrice !== undefined && !isNaN(parsedPrice) ? parsedPrice : undefined,
+        listPrice: showListPrice ? parseNumber(listPrice) : undefined,
+        priceRangeLow: showPriceRange ? parseNumber(priceRangeLow) : undefined,
+        priceRangeHigh: showPriceRange ? parseNumber(priceRangeHigh) : undefined,
+        closedPrice: showClosedPrice ? parseNumber(closedPrice) : undefined,
+        sequencing: showSequencing && sequencing ? sequencing : undefined,
         targetTimeframe: targetTimeframe.trim() || undefined,
         areaOfInterest: areaOfInterest.trim() || undefined,
         motivation: motivation.trim() || undefined,
@@ -165,6 +205,31 @@ export function DealForm({ onClose }: DealFormProps) {
           </div>
         </div>
 
+        {showSequencing && (
+          <>
+            <div className="phase-a-both-note">
+              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
+              and Next Step are coming in a later update — for now, fill the lane that
+              currently matters most and use Notes for the other side.
+            </div>
+            <div className="form-field">
+              <label htmlFor="df-sequencing">Sequencing</label>
+              <select
+                id="df-sequencing"
+                value={sequencing}
+                onChange={(e) => setSequencing(e.target.value as Sequencing | '')}
+              >
+                <option value="">Select sequencing…</option>
+                {SEQUENCING_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {SEQUENCING_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
         <div className="form-row">
           <div className="form-field">
             <label htmlFor="df-stage">Stage *</label>
@@ -173,7 +238,7 @@ export function DealForm({ onClose }: DealFormProps) {
               value={stage}
               onChange={(e) => setStage(e.target.value as Stage)}
             >
-              {STAGES.map((s) => (
+              {validStages.map((s) => (
                 <option key={s} value={s}>
                   {STAGE_LABELS[s]}
                 </option>
@@ -196,48 +261,51 @@ export function DealForm({ onClose }: DealFormProps) {
           </div>
         </div>
 
+        <div className="form-field">
+          <label htmlFor="df-probability">Probability</label>
+          <div className="form-suffix-input">
+            <input
+              id="df-probability"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={probability}
+              onChange={(e) => {
+                setProbability(e.target.value);
+                clearError('probability');
+              }}
+            />
+            <span className="form-suffix">%</span>
+          </div>
+          {errors.probability && <span className="form-error">{errors.probability}</span>}
+        </div>
+
+        <h3 className="form-group-title">Next Step</h3>
+
         <div className="form-row">
           <div className="form-field">
-            <label htmlFor="df-probability">Probability</label>
-            <div className="form-suffix-input">
-              <input
-                id="df-probability"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                value={probability}
-                onChange={(e) => {
-                  setProbability(e.target.value);
-                  clearError('probability');
-                }}
-              />
-              <span className="form-suffix">%</span>
-            </div>
-            {errors.probability && <span className="form-error">{errors.probability}</span>}
+            <label htmlFor="df-nextStep">Next Step</label>
+            <input
+              id="df-nextStep"
+              type="text"
+              placeholder="e.g. Send comps, schedule walkthrough"
+              value={nextStep}
+              onChange={(e) => setNextStep(e.target.value)}
+            />
           </div>
           <div className="form-field">
-            <label htmlFor="df-nextAction">Next Action</label>
+            <label htmlFor="df-nextStepDue">Due</label>
             <input
-              id="df-nextAction"
-              type="text"
-              value={nextAction}
-              onChange={(e) => setNextAction(e.target.value)}
+              id="df-nextStepDue"
+              type="date"
+              value={nextStepDue}
+              onChange={(e) => setNextStepDue(e.target.value)}
             />
           </div>
         </div>
 
-        <h3 className="form-group-title">Contact & Property</h3>
-
-        <div className="form-field">
-          <label htmlFor="df-address">Address</label>
-          <input
-            id="df-address"
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-        </div>
+        <h3 className="form-group-title">Contact</h3>
 
         <div className="form-row">
           <div className="form-field">
@@ -260,17 +328,76 @@ export function DealForm({ onClose }: DealFormProps) {
           </div>
         </div>
 
-        <div className="form-field">
-          <label htmlFor="df-price">Price</label>
-          <input
-            id="df-price"
-            type="number"
-            min="0"
-            step="any"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
-        </div>
+        {(showAddress || showListPrice || showPriceRange || showClosedPrice) && (
+          <h3 className="form-group-title">Property &amp; Price</h3>
+        )}
+
+        {showAddress && (
+          <div className="form-field">
+            <label htmlFor="df-address">Address</label>
+            <input
+              id="df-address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
+        )}
+
+        {showListPrice && (
+          <div className="form-field">
+            <label htmlFor="df-listPrice">List Price</label>
+            <input
+              id="df-listPrice"
+              type="number"
+              min="0"
+              step="any"
+              value={listPrice}
+              onChange={(e) => setListPrice(e.target.value)}
+            />
+          </div>
+        )}
+
+        {showPriceRange && (
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="df-priceRangeLow">Price range — low</label>
+              <input
+                id="df-priceRangeLow"
+                type="number"
+                min="0"
+                step="any"
+                value={priceRangeLow}
+                onChange={(e) => setPriceRangeLow(e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="df-priceRangeHigh">High</label>
+              <input
+                id="df-priceRangeHigh"
+                type="number"
+                min="0"
+                step="any"
+                value={priceRangeHigh}
+                onChange={(e) => setPriceRangeHigh(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {showClosedPrice && (
+          <div className="form-field">
+            <label htmlFor="df-closedPrice">Closed Price</label>
+            <input
+              id="df-closedPrice"
+              type="number"
+              min="0"
+              step="any"
+              value={closedPrice}
+              onChange={(e) => setClosedPrice(e.target.value)}
+            />
+          </div>
+        )}
 
         <div className="form-field">
           <label htmlFor="df-comments">Comments</label>

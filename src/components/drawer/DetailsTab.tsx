@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import type { Deal, OpportunityType } from '../../types';
+import type { Deal, OpportunityType, Sequencing } from '../../types';
 import {
-  STAGES,
   STAGE_LABELS,
   ASSIGNEES,
   CATEGORIES,
@@ -9,8 +8,18 @@ import {
   CATEGORY_DESCRIPTIONS,
   OPPORTUNITY_TYPES,
   OPPORTUNITY_TYPE_LABELS,
+  VALID_STAGES_BY_TYPE,
+  VALID_STAGES_WITHOUT_TYPE,
+  SEQUENCING_OPTIONS,
+  SEQUENCING_LABELS,
 } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
+import {
+  shouldShowAddress,
+  shouldShowSellerPrice,
+  shouldShowBuyerPriceRange,
+  shouldShowClosedPrice,
+} from '../deals/fieldVisibility';
 
 interface DetailsTabProps {
   deal: Deal;
@@ -29,6 +38,20 @@ function parseProbability(input: string): number | undefined {
   return rounded;
 }
 
+function parseNumber(input: string): number | undefined {
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
+function isoToDateInput(iso: string | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
 function initForm(deal: Deal) {
   return {
     clientName: deal.clientName,
@@ -37,11 +60,16 @@ function initForm(deal: Deal) {
     probability: deal.probability !== undefined ? String(deal.probability) : '',
     stage: deal.stage,
     assignedTo: deal.assignedTo,
-    nextAction: deal.nextAction ?? '',
+    nextStep: deal.nextStep ?? '',
+    nextStepDue: isoToDateInput(deal.nextStepDue),
     address: deal.address ?? '',
     phone: deal.phone ?? '',
     email: deal.email ?? '',
-    price: deal.price !== undefined ? String(deal.price) : '',
+    listPrice: deal.listPrice !== undefined ? String(deal.listPrice) : '',
+    priceRangeLow: deal.priceRangeLow !== undefined ? String(deal.priceRangeLow) : '',
+    priceRangeHigh: deal.priceRangeHigh !== undefined ? String(deal.priceRangeHigh) : '',
+    closedPrice: deal.closedPrice !== undefined ? String(deal.closedPrice) : '',
+    sequencing: (deal.sequencing ?? '') as Sequencing | '',
     comments: deal.comments ?? '',
   };
 }
@@ -51,7 +79,27 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
 
-  function handleChange(field: keyof ReturnType<typeof initForm>, value: string) {
+  const typeOrUndef: OpportunityType | undefined =
+    (form.opportunityType as OpportunityType | '') || undefined;
+  const validStages = typeOrUndef
+    ? VALID_STAGES_BY_TYPE[typeOrUndef]
+    : VALID_STAGES_WITHOUT_TYPE;
+
+  // If type changes and current stage isn't valid, snap stage back to 'lead'.
+  if (!validStages.includes(form.stage)) {
+    setForm((f) => ({ ...f, stage: 'lead' }));
+  }
+
+  const showAddress = shouldShowAddress(typeOrUndef, form.stage);
+  const showListPrice = shouldShowSellerPrice(typeOrUndef, form.stage);
+  const showPriceRange = shouldShowBuyerPriceRange(typeOrUndef, form.stage);
+  const showClosedPrice = shouldShowClosedPrice(form.stage);
+  const showSequencing = typeOrUndef === 'both';
+
+  function handleChange<K extends keyof ReturnType<typeof initForm>>(
+    field: K,
+    value: ReturnType<typeof initForm>[K],
+  ) {
     setForm((f) => ({ ...f, [field]: value }));
     if (errors.clientName && field === 'clientName') {
       setErrors((prev) => ({ ...prev, clientName: undefined }));
@@ -88,7 +136,9 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
       return;
     }
 
-    const parsedPrice = form.price.trim() ? Number(form.price) : undefined;
+    const dueIso = form.nextStepDue.trim()
+      ? new Date(form.nextStepDue).toISOString()
+      : undefined;
 
     dispatch({
       type: 'UPDATE_DEAL',
@@ -96,16 +146,21 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
         ...deal,
         clientName: trimmedName,
         category: form.category,
-        opportunityType: (form.opportunityType as OpportunityType | '') || undefined,
+        opportunityType: typeOrUndef,
         probability: parsedProbability,
         comments: form.comments.trim() || undefined,
         stage: form.stage,
         assignedTo: form.assignedTo,
-        nextAction: form.nextAction.trim() || undefined,
-        address: form.address.trim() || undefined,
+        nextStep: form.nextStep.trim() || undefined,
+        nextStepDue: dueIso,
+        address: showAddress ? (form.address.trim() || undefined) : undefined,
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
-        price: parsedPrice !== undefined && !isNaN(parsedPrice) ? parsedPrice : undefined,
+        listPrice: showListPrice ? parseNumber(form.listPrice) : undefined,
+        priceRangeLow: showPriceRange ? parseNumber(form.priceRangeLow) : undefined,
+        priceRangeHigh: showPriceRange ? parseNumber(form.priceRangeHigh) : undefined,
+        closedPrice: showClosedPrice ? parseNumber(form.closedPrice) : undefined,
+        sequencing: showSequencing && form.sequencing ? form.sequencing : undefined,
       },
     });
 
@@ -143,7 +198,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
             <select
               id="dt-category"
               value={form.category}
-              onChange={(e) => handleChange('category', e.target.value)}
+              onChange={(e) => handleChange('category', e.target.value as typeof form.category)}
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -157,7 +212,9 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
             <select
               id="dt-opportunityType"
               value={form.opportunityType}
-              onChange={(e) => handleChange('opportunityType', e.target.value)}
+              onChange={(e) =>
+                handleChange('opportunityType', e.target.value as OpportunityType | '')
+              }
             >
               <option value="">Select type…</option>
               {OPPORTUNITY_TYPES.map((t) => (
@@ -169,15 +226,42 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
           </div>
         </div>
 
+        {showSequencing && (
+          <>
+            <div className="phase-a-both-note">
+              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
+              and Next Step are coming in a later update — for now, fill the lane that
+              currently matters most and use Notes for the other side.
+            </div>
+            <div className="form-field">
+              <label htmlFor="dt-sequencing">Sequencing</label>
+              <select
+                id="dt-sequencing"
+                value={form.sequencing}
+                onChange={(e) =>
+                  handleChange('sequencing', e.target.value as Sequencing | '')
+                }
+              >
+                <option value="">Select sequencing…</option>
+                {SEQUENCING_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {SEQUENCING_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
         <div className="form-row">
           <div className="form-field">
             <label htmlFor="dt-stage">Stage *</label>
             <select
               id="dt-stage"
               value={form.stage}
-              onChange={(e) => handleChange('stage', e.target.value)}
+              onChange={(e) => handleChange('stage', e.target.value as typeof form.stage)}
             >
-              {STAGES.map((s) => (
+              {validStages.map((s) => (
                 <option key={s} value={s}>
                   {STAGE_LABELS[s]}
                 </option>
@@ -189,7 +273,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
             <select
               id="dt-assignedTo"
               value={form.assignedTo}
-              onChange={(e) => handleChange('assignedTo', e.target.value)}
+              onChange={(e) => handleChange('assignedTo', e.target.value as typeof form.assignedTo)}
             >
               {ASSIGNEES.map((a) => (
                 <option key={a} value={a}>
@@ -200,45 +284,48 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
           </div>
         </div>
 
+        <div className="form-field">
+          <label htmlFor="dt-probability">Probability</label>
+          <div className="form-suffix-input">
+            <input
+              id="dt-probability"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={form.probability}
+              onChange={(e) => handleChange('probability', e.target.value)}
+            />
+            <span className="form-suffix">%</span>
+          </div>
+          {errors.probability && <span className="form-error">{errors.probability}</span>}
+        </div>
+
+        <h3 className="form-group-title">Next Step</h3>
+
         <div className="form-row">
           <div className="form-field">
-            <label htmlFor="dt-probability">Probability</label>
-            <div className="form-suffix-input">
-              <input
-                id="dt-probability"
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                value={form.probability}
-                onChange={(e) => handleChange('probability', e.target.value)}
-              />
-              <span className="form-suffix">%</span>
-            </div>
-            {errors.probability && <span className="form-error">{errors.probability}</span>}
+            <label htmlFor="dt-nextStep">Next Step</label>
+            <input
+              id="dt-nextStep"
+              type="text"
+              placeholder="e.g. Send comps, schedule walkthrough"
+              value={form.nextStep}
+              onChange={(e) => handleChange('nextStep', e.target.value)}
+            />
           </div>
           <div className="form-field">
-            <label htmlFor="dt-nextAction">Next Action</label>
+            <label htmlFor="dt-nextStepDue">Due</label>
             <input
-              id="dt-nextAction"
-              type="text"
-              value={form.nextAction}
-              onChange={(e) => handleChange('nextAction', e.target.value)}
+              id="dt-nextStepDue"
+              type="date"
+              value={form.nextStepDue}
+              onChange={(e) => handleChange('nextStepDue', e.target.value)}
             />
           </div>
         </div>
 
-        <h3 className="form-group-title">Contact & Property</h3>
-
-        <div className="form-field">
-          <label htmlFor="dt-address">Address</label>
-          <input
-            id="dt-address"
-            type="text"
-            value={form.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-          />
-        </div>
+        <h3 className="form-group-title">Contact</h3>
 
         <div className="form-row">
           <div className="form-field">
@@ -261,17 +348,76 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
           </div>
         </div>
 
-        <div className="form-field">
-          <label htmlFor="dt-price">Price</label>
-          <input
-            id="dt-price"
-            type="number"
-            min="0"
-            step="any"
-            value={form.price}
-            onChange={(e) => handleChange('price', e.target.value)}
-          />
-        </div>
+        {(showAddress || showListPrice || showPriceRange || showClosedPrice) && (
+          <h3 className="form-group-title">Property &amp; Price</h3>
+        )}
+
+        {showAddress && (
+          <div className="form-field">
+            <label htmlFor="dt-address">Address</label>
+            <input
+              id="dt-address"
+              type="text"
+              value={form.address}
+              onChange={(e) => handleChange('address', e.target.value)}
+            />
+          </div>
+        )}
+
+        {showListPrice && (
+          <div className="form-field">
+            <label htmlFor="dt-listPrice">List Price</label>
+            <input
+              id="dt-listPrice"
+              type="number"
+              min="0"
+              step="any"
+              value={form.listPrice}
+              onChange={(e) => handleChange('listPrice', e.target.value)}
+            />
+          </div>
+        )}
+
+        {showPriceRange && (
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="dt-priceRangeLow">Price range — low</label>
+              <input
+                id="dt-priceRangeLow"
+                type="number"
+                min="0"
+                step="any"
+                value={form.priceRangeLow}
+                onChange={(e) => handleChange('priceRangeLow', e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="dt-priceRangeHigh">High</label>
+              <input
+                id="dt-priceRangeHigh"
+                type="number"
+                min="0"
+                step="any"
+                value={form.priceRangeHigh}
+                onChange={(e) => handleChange('priceRangeHigh', e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {showClosedPrice && (
+          <div className="form-field">
+            <label htmlFor="dt-closedPrice">Closed Price</label>
+            <input
+              id="dt-closedPrice"
+              type="number"
+              min="0"
+              step="any"
+              value={form.closedPrice}
+              onChange={(e) => handleChange('closedPrice', e.target.value)}
+            />
+          </div>
+        )}
 
         <div className="form-field">
           <label htmlFor="dt-comments">Comments</label>

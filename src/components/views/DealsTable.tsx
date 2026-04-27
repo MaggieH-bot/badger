@@ -23,7 +23,7 @@ type SortKey =
   | 'followUp'
   | 'daysSinceContact'
   | 'price'
-  | 'nextAction';
+  | 'nextStep';
 
 type SortDir = 'asc' | 'desc';
 
@@ -36,7 +36,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'daysSinceContact', label: 'Last Contact' },
   { key: 'address', label: 'Address' },
   { key: 'price', label: 'Price' },
-  { key: 'nextAction', label: 'Next Action' },
+  { key: 'nextStep', label: 'Next Step' },
 ];
 
 const FOLLOWUP_SORT_ORDER: Record<string, number> = {
@@ -64,6 +64,40 @@ function formatPrice(price: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(price);
+}
+
+// Pick the price to render for a row, in priority order:
+//   1. Closed → closed_price
+//   2. Seller (Listing/Under Contract) → list_price
+//   3. Buyer (Active Buyer/Under Contract) → midpoint of price range
+//   4. Legacy single price column (deprecated)
+function displayPrice(deal: DealWithUrgency): number | undefined {
+  if (deal.stage === 'closed' && deal.closedPrice !== undefined) {
+    return deal.closedPrice;
+  }
+  if (deal.listPrice !== undefined) return deal.listPrice;
+  if (deal.priceRangeLow !== undefined && deal.priceRangeHigh !== undefined) {
+    return (deal.priceRangeLow + deal.priceRangeHigh) / 2;
+  }
+  if (deal.priceRangeLow !== undefined) return deal.priceRangeLow;
+  if (deal.priceRangeHigh !== undefined) return deal.priceRangeHigh;
+  return deal.price;
+}
+
+function formatPriceCell(deal: DealWithUrgency): string {
+  // Buyer ranges render as "$300K–$400K" rather than collapsing to midpoint.
+  if (
+    deal.stage !== 'closed' &&
+    (deal.priceRangeLow !== undefined || deal.priceRangeHigh !== undefined) &&
+    deal.listPrice === undefined
+  ) {
+    const lo = deal.priceRangeLow !== undefined ? formatPrice(deal.priceRangeLow) : '';
+    const hi = deal.priceRangeHigh !== undefined ? formatPrice(deal.priceRangeHigh) : '';
+    if (lo && hi) return `${lo}–${hi}`;
+    return lo || hi;
+  }
+  const p = displayPrice(deal);
+  return p !== undefined ? formatPrice(p) : '';
 }
 
 function formatDate(iso: string): string {
@@ -101,10 +135,10 @@ function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: 
       cmp = a.daysSinceContact - b.daysSinceContact;
       break;
     case 'price':
-      cmp = (a.price ?? 0) - (b.price ?? 0);
+      cmp = (displayPrice(a) ?? 0) - (displayPrice(b) ?? 0);
       break;
-    case 'nextAction':
-      cmp = (a.nextAction ?? '').localeCompare(b.nextAction ?? '');
+    case 'nextStep':
+      cmp = (a.nextStep ?? '').localeCompare(b.nextStep ?? '');
       break;
   }
 
@@ -241,9 +275,20 @@ export function DealsTable({ mode, onSelectDeal }: DealsTableProps) {
               </td>
               <td className="deals-table-td">{deal.address ?? ''}</td>
               <td className="deals-table-td deals-table-td--price">
-                {deal.price !== undefined ? formatPrice(deal.price) : ''}
+                {formatPriceCell(deal)}
               </td>
-              <td className="deals-table-td">{deal.nextAction ?? ''}</td>
+              <td className="deals-table-td">
+                {deal.nextStep ? (
+                  <>
+                    {deal.nextStep}
+                    {deal.nextStepDue && (
+                      <span className="deals-table-due">
+                        {' '}— due {new Date(deal.nextStepDue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </>
+                ) : ''}
+              </td>
             </tr>
           ))}
         </tbody>

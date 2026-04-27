@@ -8,7 +8,7 @@ import type {
 import { STAGE_LABELS, CATEGORY_LABELS } from '../constants/pipeline';
 
 // ============================================
-// Helpers (build copy from existing fields, never leak undefined)
+// Helpers — build copy from existing fields, never leak undefined
 // ============================================
 
 function roleNoun(t: OpportunityType | undefined): string {
@@ -60,9 +60,9 @@ function touchByType(d: Deal): string {
   }
 }
 
-// Surface nextAction as the touch when present; otherwise fall back to type-based.
+// Surface nextStep as the touch when present; otherwise fall back to type-based.
 function smartTouch(d: Deal): string {
-  const next = d.nextAction?.trim();
+  const next = d.nextStep?.trim();
   if (next) return `Next up: ${next}`;
   return touchByType(d);
 }
@@ -73,18 +73,59 @@ function daysPhrase(days: number): string {
   return `${days} days`;
 }
 
-function hasNextAction(d: Deal): boolean {
-  return Boolean(d.nextAction?.trim());
+function hasNextStep(d: Deal): boolean {
+  return Boolean(d.nextStep?.trim());
 }
 
+function hasBlocker(d: Deal): boolean {
+  return Boolean(d.blocker?.trim());
+}
+
+function isOverdue(due: string | undefined, now: Date = new Date()): boolean {
+  if (!due) return false;
+  return new Date(due).getTime() < now.getTime();
+}
+
+function formatDueDate(due: string): string {
+  return new Date(due).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+// Context-aware price phrase. Prefers the typed columns; falls back to legacy `price`.
 function pricePhrase(d: Deal): string | null {
-  if (d.price === undefined || d.price === null) return null;
-  const p = d.price;
-  if (!Number.isFinite(p) || p <= 0) return null;
-  if (p >= 1_000_000) {
-    const m = p / 1_000_000;
-    return `$${m.toFixed(1).replace(/\.0$/, '')}M`;
+  // Closed: closed price wins
+  if (d.stage === 'closed' && d.closedPrice !== undefined) {
+    return formatPriceShort(d.closedPrice);
   }
+  // Sell side
+  if (
+    (d.opportunityType === 'sell' || d.opportunityType === 'both') &&
+    d.listPrice !== undefined
+  ) {
+    return formatPriceShort(d.listPrice);
+  }
+  // Buy side
+  if (
+    (d.opportunityType === 'buy' || d.opportunityType === 'both') &&
+    (d.priceRangeLow !== undefined || d.priceRangeHigh !== undefined)
+  ) {
+    const lo = d.priceRangeLow !== undefined ? formatPriceShort(d.priceRangeLow) : '';
+    const hi = d.priceRangeHigh !== undefined ? formatPriceShort(d.priceRangeHigh) : '';
+    if (lo && hi) return `${lo}–${hi}`;
+    return lo || hi;
+  }
+  // Legacy fallback
+  if (d.price !== undefined && d.price > 0) {
+    return formatPriceShort(d.price);
+  }
+  return null;
+}
+
+function formatPriceShort(p: number): string {
+  if (!Number.isFinite(p) || p <= 0) return '';
+  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
   if (p >= 1_000) return `$${Math.round(p / 1_000)}K`;
   return `$${p}`;
 }
@@ -93,14 +134,11 @@ function probabilityPhrase(d: Deal): string | null {
   return d.probability !== undefined ? `${d.probability}%` : null;
 }
 
-// Prepend a "$X — " price marker to a reason string when price is available.
 function pricedReason(d: Deal, base: string): string {
   const pp = pricePhrase(d);
   return pp ? `${pp} — ${base}` : base;
 }
 
-// One muted line for at-a-glance recall. First match wins; callers can suppress
-// sources already mentioned in the reason text.
 type ContextSource = 'timeframe' | 'motivation' | 'leadSource';
 
 function contextNoteOf(d: Deal, exclude: ContextSource[] = []): string | undefined {
@@ -121,26 +159,22 @@ function contextNoteOf(d: Deal, exclude: ContextSource[] = []): string | undefin
   return undefined;
 }
 
-function isLateStage(d: Deal): boolean {
-  return d.stage === 'closing' || d.stage === 'under_contract';
-}
-
 // ============================================
-// Rules (first match wins, evaluated top-to-bottom)
+// Rules — first match wins, evaluated top-to-bottom
 // ============================================
 
 const CLOSED_INSIGHT: BadgerInsight = {
   priority: 'low',
-  reason: 'Deal closed.',
+  reason: 'Client closed.',
   suggestedTouch: '',
   suggestedValueAdd: '',
 };
 
 export function computeInsight(d: DealWithUrgency): BadgerInsight {
-  // 1. Closed → no actionable insight (UI hides the panel)
+  // 1. Closed → no actionable insight.
   if (d.stage === 'closed') return CLOSED_INSIGHT;
 
-  // 2. Never contacted → log first touch (beats blocker / category logic)
+  // 2. Never contacted → log first touch (beats every category/stage rule).
   if (d.neverContacted) {
     return {
       priority: 'high',
@@ -151,41 +185,70 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 3. Late stage (closing / under_contract) + blocker → critical close-blocker
-  //    Wins over the close-risk rule because the blocker IS the issue.
-  if (isLateStage(d) && d.blocker?.trim()) {
-    const stageLabel = STAGE_LABELS[d.stage];
-    return {
-      priority: 'high',
-      reason: pricedReason(d, `${stageLabel} blocked: ${d.blocker.trim()}`),
-      suggestedTouch:
-        'Resolve the blocker with the client today — the close depends on it.',
-      suggestedValueAdd:
-        'Send a closing/escrow checklist with the open item highlighted.',
-      contextNote: contextNoteOf(d),
-    };
-  }
+  // ============================================
+  // Under Contract escalation block (Stage = transactional sensitivity)
+  // Per locked rule: Under Contract is NOT a cadence override. It's a set of
+  // surface-on-Today rules driven by specific signals.
+  // ============================================
 
-  // 4. needs_attention + late stage → close-risk (price-aware)
-  if (d.followUpStatus === 'needs_attention' && isLateStage(d)) {
-    const base = `Deal in ${STAGE_LABELS[d.stage]} hasn't been touched in ${daysPhrase(d.daysSinceContact)} — risk to close.`;
-    return {
-      priority: 'high',
-      reason: pricedReason(d, base),
-      suggestedTouch: 'Confirm timeline and outstanding items today.',
-      suggestedValueAdd: 'Send a closing/escrow checklist.',
-      contextNote: contextNoteOf(d),
-    };
-  }
+  if (d.stage === 'under_contract') {
+    // 3a. Blocker → critical, contract at risk.
+    if (hasBlocker(d)) {
+      return {
+        priority: 'high',
+        reason: pricedReason(d, `Under Contract — blocked: ${d.blocker!.trim()}`),
+        suggestedTouch:
+          'Resolve the blocker with the client today — the close depends on it.',
+        suggestedValueAdd:
+          'Send a closing checklist with the open item highlighted.',
+        contextNote: contextNoteOf(d),
+      };
+    }
 
-  // 5. Sell + under_contract (on track) → contract management
-  if (
-    d.stage === 'under_contract' &&
-    (d.opportunityType === 'sell' || d.opportunityType === 'both')
-  ) {
+    // 3b. Overdue Next Step → critical.
+    if (isOverdue(d.nextStepDue)) {
+      return {
+        priority: 'high',
+        reason: pricedReason(
+          d,
+          `Under Contract — overdue: "${d.nextStep ?? 'next step'}" was due ${formatDueDate(d.nextStepDue!)}.`,
+        ),
+        suggestedTouch: 'Catch up the overdue step today.',
+        suggestedValueAdd: 'Send a closing/escrow checklist.',
+        contextNote: contextNoteOf(d),
+      };
+    }
+
+    // 3c. No Next Step at all → critical, define one now.
+    if (!hasNextStep(d)) {
+      return {
+        priority: 'high',
+        reason: pricedReason(d, 'Under Contract — no next step defined.'),
+        suggestedTouch:
+          'Set the next concrete step today. Contracts can break without active management.',
+        suggestedValueAdd: 'Send a closing/escrow checklist.',
+        contextNote: contextNoteOf(d),
+      };
+    }
+
+    // 3d. Cold by category cadence → close-risk.
+    if (d.followUpStatus === 'needs_attention') {
+      return {
+        priority: 'high',
+        reason: pricedReason(
+          d,
+          `Under Contract — last touch was ${daysPhrase(d.daysSinceContact)} ago.`,
+        ),
+        suggestedTouch: 'Confirm timeline and outstanding items today.',
+        suggestedValueAdd: 'Send a closing/escrow checklist.',
+        contextNote: contextNoteOf(d),
+      };
+    }
+
+    // 3e. On track Under Contract — surface as medium so it stays on Today.
     return {
       priority: 'medium',
-      reason: pricedReason(d, 'Under contract — protect the timeline.'),
+      reason: pricedReason(d, 'Under Contract — protect the timeline.'),
       suggestedTouch: smartTouch(d),
       suggestedValueAdd:
         'Confirm contingencies, inspection dates, and lender deadlines.',
@@ -193,44 +256,26 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 6. Hot + blocker (any non-late stage) → unblock fast
-  if (d.category === 'hot' && d.blocker?.trim()) {
-    return {
-      priority: 'high',
-      reason: `Hot client blocked: ${d.blocker.trim()}`,
-      suggestedTouch: 'Tackle the blocker with the client directly.',
-      suggestedValueAdd: valueAddByType(d),
-      contextNote: contextNoteOf(d),
-    };
-  }
+  // ============================================
+  // Listing-stage escalation (sell or both)
+  // ============================================
 
-  // 7. Buy + active + needs_attention → buyer momentum at risk
-  if (
-    d.stage === 'active' &&
-    d.opportunityType === 'buy' &&
-    d.followUpStatus === 'needs_attention'
-  ) {
-    return {
-      priority: 'high',
-      reason: `Active buyer cooled off — ${daysPhrase(d.daysSinceContact)} since last contact.`,
-      suggestedTouch: `Send 2–3 fresh listings in ${areaPhrase(d)} and offer a tour window this week.`,
-      suggestedValueAdd:
-        'Re-confirm budget and must-haves before momentum stalls.',
-      contextNote: contextNoteOf(d),
-    };
-  }
-
-  // 8. Active sell/both listing — stage drives the copy, not category.
-  if (
-    d.stage === 'active' &&
-    (d.opportunityType === 'sell' || d.opportunityType === 'both')
-  ) {
+  if (d.stage === 'listing') {
+    if (hasBlocker(d)) {
+      return {
+        priority: 'high',
+        reason: pricedReason(d, `Listing blocked: ${d.blocker!.trim()}`),
+        suggestedTouch: 'Tackle the blocker so the listing keeps moving.',
+        suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
+        contextNote: contextNoteOf(d),
+      };
+    }
     if (d.followUpStatus === 'needs_attention') {
       return {
         priority: 'high',
         reason: pricedReason(
           d,
-          `Active listing hasn't had a touch in ${daysPhrase(d.daysSinceContact)}.`,
+          `Listing hasn't had a touch in ${daysPhrase(d.daysSinceContact)}.`,
         ),
         suggestedTouch:
           'Send showing feedback, market activity, and a recommendation.',
@@ -238,10 +283,10 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
         contextNote: contextNoteOf(d),
       };
     }
-    if (!hasNextAction(d)) {
+    if (!hasNextStep(d)) {
       return {
-        priority: 'high',
-        reason: pricedReason(d, 'Active listing has no defined next step.'),
+        priority: 'medium',
+        reason: pricedReason(d, 'Listing has no defined next step.'),
         suggestedTouch: 'Set a recurring update cadence (weekly market touch).',
         suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
@@ -249,41 +294,118 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     }
     return {
       priority: 'medium',
-      reason: pricedReason(d, 'Active listing — keep regular updates flowing.'),
+      reason: pricedReason(d, 'Listing — keep regular updates flowing.'),
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
       contextNote: contextNoteOf(d),
     };
   }
 
-  // 9. Buy + lead → activate the buyer while interest is fresh
-  if (d.stage === 'lead' && d.opportunityType === 'buy') {
+  // ============================================
+  // Active Buyer-stage escalation
+  // ============================================
+
+  if (d.stage === 'active_buyer') {
+    if (hasBlocker(d)) {
+      return {
+        priority: 'high',
+        reason: `Active buyer blocked: ${d.blocker!.trim()}`,
+        suggestedTouch: 'Tackle the blocker — buyer momentum stalls fast.',
+        suggestedValueAdd: 'Re-confirm budget and must-haves before momentum stalls.',
+        contextNote: contextNoteOf(d),
+      };
+    }
+    if (d.followUpStatus === 'needs_attention') {
+      return {
+        priority: 'high',
+        reason: `Active buyer cooled off — ${daysPhrase(d.daysSinceContact)} since last contact.`,
+        suggestedTouch: `Send 2–3 fresh listings in ${areaPhrase(d)} and offer a tour window this week.`,
+        suggestedValueAdd:
+          'Re-confirm budget and must-haves before momentum stalls.',
+        contextNote: contextNoteOf(d),
+      };
+    }
+    if (!hasNextStep(d)) {
+      return {
+        priority: 'medium',
+        reason: 'Active buyer has no defined next step.',
+        suggestedTouch:
+          'Plan the next showing window or share a curated list.',
+        suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+        contextNote: contextNoteOf(d),
+      };
+    }
     return {
       priority: 'medium',
-      reason: 'New buyer lead — activate them while interest is fresh.',
-      suggestedTouch:
-        'Schedule a discovery call: budget, timeline, must-haves.',
-      suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+      reason: 'Active buyer — keep momentum.',
+      suggestedTouch: smartTouch(d),
+      suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
   }
 
-  // 10. Sell + lead → start prelisting prep
-  if (
-    d.stage === 'lead' &&
-    (d.opportunityType === 'sell' || d.opportunityType === 'both')
-  ) {
+  // ============================================
+  // Lead-stage rules
+  // ============================================
+
+  if (d.stage === 'lead') {
+    if (d.opportunityType === 'buy' || d.opportunityType === 'rent') {
+      return {
+        priority: 'medium',
+        reason: 'New buyer lead — activate them while interest is fresh.',
+        suggestedTouch:
+          'Schedule a discovery call: budget, timeline, must-haves.',
+        suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+        contextNote: contextNoteOf(d),
+      };
+    }
+    if (d.opportunityType === 'sell' || d.opportunityType === 'both') {
+      return {
+        priority: 'medium',
+        reason: 'New seller lead — start prelisting prep.',
+        suggestedTouch: 'Schedule a walkthrough and pricing conversation.',
+        suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
+        contextNote: contextNoteOf(d),
+      };
+    }
+    // Type unset — generic lead nudge
     return {
       priority: 'medium',
-      reason: 'New seller lead — start prelisting prep.',
-      suggestedTouch: 'Schedule a walkthrough and pricing conversation.',
-      suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
+      reason: 'New lead — confirm Buy / Sell / Both intent.',
+      suggestedTouch: 'Discovery call to establish intent and timeline.',
+      suggestedValueAdd: 'Light market overview based on their stated area.',
       contextNote: contextNoteOf(d),
     };
   }
 
-  // 11. Hot + no nextAction → high (also surfaces needs_attention in reason)
-  if (d.category === 'hot' && !hasNextAction(d)) {
+  // ============================================
+  // Category-driven rules (catch-all for non-stage-specific situations)
+  // ============================================
+
+  // Blocker on a Hot client (any non-stage-specific) → high.
+  if (d.category === 'hot' && hasBlocker(d)) {
+    return {
+      priority: 'high',
+      reason: `Hot client blocked: ${d.blocker!.trim()}`,
+      suggestedTouch: 'Tackle the blocker with the client directly.',
+      suggestedValueAdd: valueAddByType(d),
+      contextNote: contextNoteOf(d),
+    };
+  }
+
+  // Overdue next step (any category, any stage that fell through above) → bump.
+  if (hasNextStep(d) && isOverdue(d.nextStepDue)) {
+    return {
+      priority: d.category === 'watch' ? 'medium' : 'high',
+      reason: `Overdue: "${d.nextStep!.trim()}" was due ${formatDueDate(d.nextStepDue!)}.`,
+      suggestedTouch: 'Catch up the overdue step today.',
+      suggestedValueAdd: valueAddByType(d),
+      contextNote: contextNoteOf(d),
+    };
+  }
+
+  // Hot, no next step.
+  if (d.category === 'hot' && !hasNextStep(d)) {
     const role = roleNoun(d.opportunityType);
     const conf = probabilityPhrase(d);
     const confSuffix = conf ? ` (${conf})` : '';
@@ -300,7 +422,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 12. Hot + needs_attention (with nextAction) → high
+  // Hot, needs attention (with next step).
   if (d.category === 'hot' && d.followUpStatus === 'needs_attention') {
     const conf = probabilityPhrase(d);
     const confSuffix = conf ? ` (${conf})` : '';
@@ -313,8 +435,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 13. Nurture + no nextAction → medium
-  if (d.category === 'nurture' && !hasNextAction(d)) {
+  // Nurture, no next step.
+  if (d.category === 'nurture' && !hasNextStep(d)) {
     const role = roleNoun(d.opportunityType);
     const reason =
       d.followUpStatus === 'needs_attention'
@@ -329,7 +451,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 14. Nurture + needs_attention (with nextAction) → medium
+  // Nurture, needs attention.
   if (d.category === 'nurture' && d.followUpStatus === 'needs_attention') {
     return {
       priority: 'medium',
@@ -340,7 +462,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 15. Hot on_track (with nextAction) → medium
+  // Hot on track.
   if (d.category === 'hot') {
     const conf = probabilityPhrase(d);
     const confClause = conf ? ` at ${conf} confidence` : '';
@@ -353,8 +475,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 16. Nurture + targetTimeframe (on_track, has nextAction) → medium
-  //     Timeframe is in the reason — exclude it from the context note.
+  // Nurture with target timeframe.
   if (d.category === 'nurture' && d.targetTimeframe?.trim()) {
     return {
       priority: 'medium',
@@ -365,8 +486,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 17. Watch + no nextAction → low
-  if (d.category === 'watch' && !hasNextAction(d)) {
+  // Watch.
+  if (d.category === 'watch' && !hasNextStep(d)) {
     return {
       priority: 'low',
       reason: 'Long-term contact has no defined next step.',
@@ -376,7 +497,6 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 18. Watch + has nextAction → low
   if (d.category === 'watch') {
     return {
       priority: 'low',
@@ -388,7 +508,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     };
   }
 
-  // 19. Fallback (Nurture on_track, has nextAction, no timeframe)
+  // Fallback (Nurture on track, has next step, no timeframe).
   return {
     priority: 'low',
     reason: `${CATEGORY_LABELS[d.category]} ${roleNoun(d.opportunityType)} on track.`,
@@ -420,6 +540,9 @@ export function sortByInsightPriority(items: DealWithInsight[]): DealWithInsight
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 }
+
+// Reference STAGE_LABELS to keep the import alive (used implicitly through formatters).
+void STAGE_LABELS;
 
 export const CALM_BRIEFING_MESSAGE =
   'All active clients are on track. Use this window to deepen a Nurture or Watch relationship.';

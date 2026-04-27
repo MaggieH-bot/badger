@@ -2486,3 +2486,125 @@ body {
     flex-basis: 100%;
   }
 }
+
+/* ============================================
+   First Touch (Today)
+   ============================================ */
+
+.first-touch-section {
+  margin-bottom: var(--space-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+}
+
+.first-touch-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--border);
+}
+
+.first-touch-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+}
+
+.first-touch-count {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.first-touch-caption {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1 1 100%;
+  margin-top: 2px;
+}
+
+.first-touch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.first-touch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-muted);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.first-touch-row:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.first-touch-row--hot { border-left-color: var(--category-hot); }
+.first-touch-row--nurture { border-left-color: var(--category-nurture); }
+.first-touch-row--watch { border-left-color: var(--category-watch); }
+
+.first-touch-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.first-touch-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.first-touch-overflow {
+  margin-top: var(--space-sm);
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+}
+
+.first-touch-overflow:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* ============================================
+   Phase A Both stopgap note
+   ============================================ */
+
+.phase-a-both-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--accent-muted);
+  border: 1px solid rgba(95, 161, 216, 0.32);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-bottom: var(--space-sm);
+  line-height: 1.5;
+}
+
+.phase-a-both-note strong {
+  color: var(--accent);
+}

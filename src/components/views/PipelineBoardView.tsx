@@ -25,10 +25,9 @@ export function PipelineBoardView({ onSelectDeal }: PipelineBoardViewProps) {
 
   const grouped: Record<Stage, DealWithUrgency[]> = {
     lead: [],
-    prospect: [],
-    active: [],
+    listing: [],
+    active_buyer: [],
     under_contract: [],
-    closing: [],
     closed: [],
   };
   for (const deal of withUrgency) {

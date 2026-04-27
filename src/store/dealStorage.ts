@@ -18,8 +18,8 @@ function migrateOpportunityType(raw: unknown): OpportunityType | undefined {
 }
 
 function deriveCategoryFromLegacy(stage: Stage, probability: unknown): Category {
-  // 1. Stage check first — under_contract / closing are always Hot
-  if (stage === 'under_contract' || stage === 'closing') return 'hot';
+  // 1. Stage check first — Under Contract → Hot
+  if (stage === 'under_contract') return 'hot';
 
   // 2. Probability-based bucketing
   if (typeof probability === 'number' && !isNaN(probability)) {
@@ -63,7 +63,11 @@ function migrateDeal(raw: Record<string, unknown>): Deal {
     phone: (raw.phone as string | undefined) ?? undefined,
     email: (raw.email as string | undefined) ?? undefined,
     price: typeof raw.price === 'number' ? raw.price : undefined,
-    nextAction: (raw.nextAction as string | undefined) ?? undefined,
+    // Legacy localStorage records used `nextAction`; new shape uses `nextStep`.
+    nextStep:
+      (raw.nextStep as string | undefined) ??
+      (raw.nextAction as string | undefined) ??
+      undefined,
 
     // New primary pipeline fields
     category,

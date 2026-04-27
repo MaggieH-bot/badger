@@ -1,9 +1,5 @@
 import type { Deal, DealWithUrgency, Urgency, FollowUpStatus } from '../types';
-import {
-  CATEGORY_CADENCE_DAYS,
-  STAGE_CADENCE_OVERRIDES,
-  ACTIVE_LISTING_CADENCE_DAYS,
-} from '../constants/pipeline';
+import { CATEGORY_CADENCE_DAYS } from '../constants/pipeline';
 
 function daysBetween(isoDate: string, now: Date): number {
   const then = new Date(isoDate);
@@ -12,24 +8,12 @@ function daysBetween(isoDate: string, now: Date): number {
 }
 
 // Resolve the effective outreach cadence (in days) for a deal.
-// Order of precedence:
-//   1. Closed stage → null (no cadence; excluded from urgency)
-//   2. Late-transaction stage override (closing / under_contract) → that override
-//   3. Active seller-side listing (sell or both, in 'active' stage) → 5-day cadence
-//   4. Category cadence (hot / nurture / watch)
+// Pure category-driven: Hot 7, Nurture 21, Watch 60.
+// Stage does NOT override cadence — it adds insight-level escalation in
+// insights.ts (e.g. Under Contract + blocker → high) but never overrides the
+// user-set Category.
 export function effectiveCadenceDays(deal: Deal): number | null {
   if (deal.stage === 'closed') return null;
-
-  const stageOverride = STAGE_CADENCE_OVERRIDES[deal.stage];
-  if (stageOverride !== undefined) return stageOverride;
-
-  if (
-    deal.stage === 'active' &&
-    (deal.opportunityType === 'sell' || deal.opportunityType === 'both')
-  ) {
-    return ACTIVE_LISTING_CADENCE_DAYS;
-  }
-
   return CATEGORY_CADENCE_DAYS[deal.category];
 }
 

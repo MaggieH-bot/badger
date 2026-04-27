@@ -5,45 +5,52 @@ import type {
   DocumentType,
   Category,
   OpportunityType,
+  Sequencing,
 } from '../types';
 
+// V1 stage model. The full set is shared, but each Opportunity Type uses a subset
+// (see VALID_STAGES_BY_TYPE below).
 export const STAGES: readonly Stage[] = [
   'lead',
-  'prospect',
-  'active',
+  'listing',
+  'active_buyer',
   'under_contract',
-  'closing',
   'closed',
 ] as const;
 
 export const ACTIVE_STAGES: readonly Stage[] = [
   'lead',
-  'prospect',
-  'active',
+  'listing',
+  'active_buyer',
   'under_contract',
-  'closing',
 ] as const;
 
 export const STAGE_LABELS: Record<Stage, string> = {
   lead: 'Lead',
-  prospect: 'Prospect',
-  active: 'Active',
+  listing: 'Listing',
+  active_buyer: 'Active Buyer',
   under_contract: 'Under Contract',
-  closing: 'Closing',
   closed: 'Closed',
 };
 
-// Stage overrides — apply only to specific late-transaction stages.
-// All other stages fall through to category cadence.
-export const STAGE_CADENCE_OVERRIDES: Partial<Record<Stage, number>> = {
-  under_contract: 2,
-  closing: 1,
+// Which Stages are valid for a given Opportunity Type. The form/drawer uses
+// this to filter the Stage dropdown so users can't pick incoherent combos.
+// 'both' permits all stages (the active lane drives which one is shown).
+// 'rent' rides on the buyer-side path.
+// undefined opportunity type → only the universal stages.
+export const VALID_STAGES_BY_TYPE: Record<OpportunityType, readonly Stage[]> = {
+  buy: ['lead', 'active_buyer', 'under_contract', 'closed'],
+  sell: ['lead', 'listing', 'under_contract', 'closed'],
+  both: ['lead', 'listing', 'active_buyer', 'under_contract', 'closed'],
+  rent: ['lead', 'active_buyer', 'under_contract', 'closed'],
 };
 
-// Active seller-side listing cadence override.
-// Applies when stage = 'active' AND opportunityType in {'sell', 'both'}.
-// Tighter than Hot's 7-day default — live listings need regular updates.
-export const ACTIVE_LISTING_CADENCE_DAYS = 5;
+export const VALID_STAGES_WITHOUT_TYPE: readonly Stage[] = ['lead', 'closed'];
+
+// Per-stage attention escalation:
+//   No cadence overrides — Stage does NOT compete with Category for cadence days.
+//   Stage adds insight-level escalation in insights.ts (e.g. Under Contract +
+//   blocker → high priority) but never overrides the user-set Category cadence.
 
 export const ASSIGNEES: readonly Assignee[] = [
   'You',
@@ -86,7 +93,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   other: 'Other',
 };
 
-// --- Pipeline category (PRIMARY readiness lens) ---
+// --- Pipeline category (attention intensity, user-set, never overridden by Stage) ---
 
 export const CATEGORIES: readonly Category[] = ['hot', 'nurture', 'watch'] as const;
 
@@ -102,8 +109,8 @@ export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
   watch: '6–12 months out',
 };
 
-// Outreach cadence per category, in days.
-// Drives follow-up urgency unless a stage override applies (see STAGE_CADENCE_OVERRIDES).
+// Outreach cadence per category, in days. Pure category-driven.
+// Stage-driven escalation lives in insights.ts and is additive, not an override.
 export const CATEGORY_CADENCE_DAYS: Record<Category, number> = {
   hot: 7,
   nurture: 21,
@@ -124,4 +131,20 @@ export const OPPORTUNITY_TYPE_LABELS: Record<OpportunityType, string> = {
   sell: 'Sell',
   both: 'Both',
   rent: 'Rent',
+};
+
+// --- Sequencing (Both-only) ---
+
+export const SEQUENCING_OPTIONS: readonly Sequencing[] = [
+  'sell_first',
+  'buy_first',
+  'parallel',
+  'unknown',
+] as const;
+
+export const SEQUENCING_LABELS: Record<Sequencing, string> = {
+  sell_first: 'Sell first, then buy',
+  buy_first: 'Buy first, then sell',
+  parallel: 'Run in parallel',
+  unknown: 'Not sure yet',
 };
