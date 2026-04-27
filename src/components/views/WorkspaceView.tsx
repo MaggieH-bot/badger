@@ -187,7 +187,9 @@ export function WorkspaceView() {
             {members.map((m) => (
               <li key={m.userId} className="workspace-list-row">
                 <span className="workspace-list-primary">
-                  {m.userId === user?.id ? 'You' : m.userId}
+                  {m.userId === user?.id
+                    ? `You${m.email ? ` (${m.email})` : ''}`
+                    : m.email ?? 'Workspace member'}
                 </span>
                 <span className="workspace-list-meta">
                   {m.role === 'owner' ? 'Owner' : 'Member'} · joined {formatTimestamp(m.joinedAt)}

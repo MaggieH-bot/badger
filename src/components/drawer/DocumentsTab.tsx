@@ -1,8 +1,11 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import type { Deal, Document as DocType, Assignee, DocumentType } from '../../types';
-import { ASSIGNEES, DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../../constants/pipeline';
+import type { Deal, Document as DocType, DocumentType } from '../../types';
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useWorkspace } from '../../store/useWorkspace';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
+import { buildAssigneeOptions } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
 import { uploadDocumentFile, getDocumentSignedUrl } from '../../api/documents';
 
@@ -35,10 +38,14 @@ function formatFileSize(bytes: number): string {
 function AddDocumentForm({ dealId }: { dealId: string }) {
   const { dispatch } = useDeals();
   const { workspace } = useWorkspace();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+  const currentUserId = user?.id ?? null;
+  const authorOptions = buildAssigneeOptions(members, currentUserId);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [docType, setDocType] = useState<DocumentType>('agreement');
-  const [author, setAuthor] = useState<Assignee>('You');
+  const [author, setAuthor] = useState<string>(currentUserId ?? '');
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -206,16 +213,16 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
         </div>
       </div>
       <div className="form-field">
-        <label htmlFor="doc-author">Author *</label>
+        <label htmlFor="doc-author">Author</label>
         <select
           id="doc-author"
           value={author}
-          onChange={(e) => setAuthor(e.target.value as Assignee)}
+          onChange={(e) => setAuthor(e.target.value)}
           disabled={busy}
         >
-          {ASSIGNEES.map((a) => (
-            <option key={a} value={a}>
-              {a}
+          {authorOptions.map((opt) => (
+            <option key={opt.value || 'unassigned'} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>
@@ -285,9 +292,13 @@ function DocumentEditor({
   onDone: () => void;
 }) {
   const { dispatch } = useDeals();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+  const currentUserId = user?.id ?? null;
+  const authorOptions = buildAssigneeOptions(members, currentUserId);
   const [title, setTitle] = useState(doc.title);
   const [docType, setDocType] = useState<DocumentType>(doc.type);
-  const [author, setAuthor] = useState<Assignee>(doc.author);
+  const [author, setAuthor] = useState<string>(doc.author);
   const [content, setContent] = useState(doc.content ?? '');
   const [errors, setErrors] = useState<{ title?: string }>({});
 
@@ -350,15 +361,15 @@ function DocumentEditor({
         </div>
       </div>
       <div className="form-field">
-        <label htmlFor={`doc-edit-author-${doc.id}`}>Author *</label>
+        <label htmlFor={`doc-edit-author-${doc.id}`}>Author</label>
         <select
           id={`doc-edit-author-${doc.id}`}
           value={author}
-          onChange={(e) => setAuthor(e.target.value as Assignee)}
+          onChange={(e) => setAuthor(e.target.value)}
         >
-          {ASSIGNEES.map((a) => (
-            <option key={a} value={a}>
-              {a}
+          {authorOptions.map((opt) => (
+            <option key={opt.value || 'unassigned'} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>

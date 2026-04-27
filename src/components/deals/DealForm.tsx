@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import type { Stage, Assignee, Category, OpportunityType, Sequencing } from '../../types';
+import type { Stage, Category, OpportunityType, Sequencing } from '../../types';
 import {
   STAGE_LABELS,
-  ASSIGNEES,
   CATEGORIES,
   CATEGORY_LABELS,
   CATEGORY_DESCRIPTIONS,
@@ -14,7 +13,10 @@ import {
   SEQUENCING_LABELS,
 } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { generateId } from '../../utils/ids';
+import { buildAssigneeOptions } from '../../utils/assignee';
 import {
   shouldShowAddress,
   shouldShowSellerPrice,
@@ -45,13 +47,19 @@ function parseNumber(input: string): number | undefined {
 
 export function DealForm({ onClose }: DealFormProps) {
   const { dispatch } = useDeals();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+  const currentUserId = user?.id ?? null;
+  const assigneeOptions = buildAssigneeOptions(members, currentUserId);
 
   const [clientName, setClientName] = useState('');
   const [category, setCategory] = useState<Category>('nurture');
   const [opportunityType, setOpportunityType] = useState<OpportunityType | ''>('');
   const [probability, setProbability] = useState('');
   const [stage, setStage] = useState<Stage>('lead');
-  const [assignedTo, setAssignedTo] = useState<Assignee>('You');
+  // Default to the current user so new clients are assigned to whoever is
+  // creating them. Falls back to Unassigned if user.id isn't available yet.
+  const [assignedTo, setAssignedTo] = useState<string>(currentUserId ?? '');
   const [nextStep, setNextStep] = useState('');
   const [nextStepDue, setNextStepDue] = useState('');
   const [address, setAddress] = useState('');
@@ -246,15 +254,15 @@ export function DealForm({ onClose }: DealFormProps) {
             </select>
           </div>
           <div className="form-field">
-            <label htmlFor="df-assignedTo">Assigned To *</label>
+            <label htmlFor="df-assignedTo">Assigned To</label>
             <select
               id="df-assignedTo"
               value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value as Assignee)}
+              onChange={(e) => setAssignedTo(e.target.value)}
             >
-              {ASSIGNEES.map((a) => (
-                <option key={a} value={a}>
-                  {a}
+              {assigneeOptions.map((opt) => (
+                <option key={opt.value || 'unassigned'} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>

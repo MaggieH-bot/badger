@@ -3,7 +3,10 @@ import type { DealWithUrgency, Category } from '../../types';
 import { STAGE_LABELS, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { computeUrgency } from '../../utils/urgency';
+import { displayAssignee } from '../../utils/assignee';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
 import { DealCard } from '../deals/DealCard';
 import { matchesSearch } from '../../utils/search';
@@ -155,6 +158,9 @@ function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: 
 export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+  const currentUserId = user?.id ?? null;
   const [sortKey, setSortKey] = useState<SortKey>('daysSinceContact');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -279,7 +285,9 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
                 )}
               </td>
               <td className="deals-table-td">{STAGE_LABELS[deal.stage]}</td>
-              <td className="deals-table-td">{deal.assignedTo}</td>
+              <td className="deals-table-td">
+                {displayAssignee(deal.assignedTo, members, currentUserId)}
+              </td>
               <td className="deals-table-td">
                 {deal.followUpStatus === 'needs_attention' ? (
                   <span className="attention-pill">Needs Attention</span>

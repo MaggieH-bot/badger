@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import type { Deal, OpportunityType, Sequencing } from '../../types';
 import {
   STAGE_LABELS,
-  ASSIGNEES,
   CATEGORIES,
   CATEGORY_LABELS,
   CATEGORY_DESCRIPTIONS,
@@ -14,6 +13,9 @@ import {
   SEQUENCING_LABELS,
 } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
+import { buildAssigneeOptions, isLegacyAssignee } from '../../utils/assignee';
 import {
   shouldShowAddress,
   shouldShowSellerPrice,
@@ -76,8 +78,22 @@ function initForm(deal: Deal) {
 
 export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: DetailsTabProps) {
   const { dispatch } = useDeals();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
+
+  const currentUserId = user?.id ?? null;
+  // Pass through any legacy assigned_to value the deal currently has so the
+  // dropdown can show it as "(legacy)" without offering it as a new choice.
+  const legacyValueInUse = isLegacyAssignee(form.assignedTo)
+    ? form.assignedTo
+    : undefined;
+  const assigneeOptions = buildAssigneeOptions(
+    members,
+    currentUserId,
+    legacyValueInUse,
+  );
 
   const typeOrUndef: OpportunityType | undefined =
     (form.opportunityType as OpportunityType | '') || undefined;
@@ -269,15 +285,15 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
             </select>
           </div>
           <div className="form-field">
-            <label htmlFor="dt-assignedTo">Assigned To *</label>
+            <label htmlFor="dt-assignedTo">Assigned To</label>
             <select
               id="dt-assignedTo"
               value={form.assignedTo}
-              onChange={(e) => handleChange('assignedTo', e.target.value as typeof form.assignedTo)}
+              onChange={(e) => handleChange('assignedTo', e.target.value)}
             >
-              {ASSIGNEES.map((a) => (
-                <option key={a} value={a}>
-                  {a}
+              {assigneeOptions.map((opt) => (
+                <option key={opt.value || 'unassigned'} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>

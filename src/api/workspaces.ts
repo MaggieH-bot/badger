@@ -71,12 +71,36 @@ async function addMembership(
   workspaceId: string,
   userId: string,
   role: MemberRole,
+  email: string | null,
 ): Promise<void> {
   const { error } = await supabase
     .from('workspace_members')
-    .insert({ workspace_id: workspaceId, user_id: userId, role });
+    .insert({
+      workspace_id: workspaceId,
+      user_id: userId,
+      role,
+      email: email ?? null,
+    });
 
   if (error) throw error;
+}
+
+// Lazy backfill: ensure the current user's row carries their email so
+// teammates can see them in dropdowns. No-op if already populated.
+async function ensureMyEmailRecorded(
+  workspaceId: string,
+  userId: string,
+  email: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('workspace_members')
+    .update({ email })
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+    .is('email', null);
+  if (error) {
+    console.warn('[badger] could not backfill member email:', error);
+  }
 }
 
 /**
@@ -97,43 +121,56 @@ export async function ensureWorkspaceForCurrentUser(
   userId: string,
   email: string | null,
 ): Promise<Workspace> {
+  let resolved: Workspace | null = null;
+
   // 1. Already a member?
   const member = await fetchWorkspaceViaMembership(userId);
-  if (member) return member;
+  if (member) {
+    resolved = member;
+  }
 
   // 2. Pending invite for our email?
-  if (email) {
+  if (!resolved && email) {
     const invite = await findPendingInviteForCurrentUser(email);
     if (invite) {
-      await addMembership(invite.workspaceId, userId, 'member');
-      // Mark accepted (audit trail). Best-effort: don't fail the join if this fails.
+      await addMembership(invite.workspaceId, userId, 'member', email);
       try {
         await markInviteAccepted(invite.inviteId);
       } catch (err) {
         console.warn('[badger] could not mark invite accepted:', err);
       }
-      const ws = await fetchWorkspaceById(invite.workspaceId);
-      if (ws) return ws;
+      resolved = await fetchWorkspaceById(invite.workspaceId);
     }
   }
 
   // 3. Created but missing membership? (recovery from prior partial failure)
-  const owned = await fetchOwnedWorkspace(userId);
-  if (owned) {
-    await addMembership(owned.id, userId, 'owner');
-    return owned;
+  if (!resolved) {
+    const owned = await fetchOwnedWorkspace(userId);
+    if (owned) {
+      await addMembership(owned.id, userId, 'owner', email);
+      resolved = owned;
+    }
   }
 
   // 4. Bootstrap fresh
-  const created = await createWorkspace(userId);
-  await addMembership(created.id, userId, 'owner');
-  return created;
+  if (!resolved) {
+    const created = await createWorkspace(userId);
+    await addMembership(created.id, userId, 'owner', email);
+    resolved = created;
+  }
+
+  // Lazy backfill for users whose row predates the email column.
+  if (email) {
+    await ensureMyEmailRecorded(resolved.id, userId, email);
+  }
+  return resolved;
 }
 
 /**
  * List members of a workspace with their email + role.
- * Note: Supabase RLS may restrict which auth.users rows are visible; we
- * gracefully fall back to user_id when email is unavailable.
+ * The `email` field is populated for members who have logged in since the
+ * 2026-04-27 migration; older rows may have null until their next login
+ * triggers ensureMyEmailRecorded().
  */
 export interface WorkspaceMember {
   userId: string;
@@ -147,14 +184,14 @@ export async function listWorkspaceMembers(
 ): Promise<WorkspaceMember[]> {
   const { data, error } = await supabase
     .from('workspace_members')
-    .select('user_id, role, created_at')
+    .select('user_id, role, email, created_at')
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []).map((row) => ({
     userId: row.user_id as string,
     role: row.role as string,
-    email: null,
+    email: (row.email as string | null) ?? null,
     joinedAt: row.created_at as string,
   }));
 }

@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import type { Deal, ContactMethod, Assignee, Note as NoteType } from '../../types';
-import { CONTACT_METHODS, CONTACT_METHOD_LABELS, ASSIGNEES } from '../../constants/pipeline';
+import type { Deal, ContactMethod, Note as NoteType } from '../../types';
+import { CONTACT_METHODS, CONTACT_METHOD_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
+import { buildAssigneeOptions } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
 
 interface ActivityTabProps {
@@ -23,8 +26,12 @@ function formatTimestamp(iso: string): string {
 
 function LogActivityForm({ deal }: { deal: Deal }) {
   const { dispatch } = useDeals();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+  const currentUserId = user?.id ?? null;
+  const authorOptions = buildAssigneeOptions(members, currentUserId);
   const [method, setMethod] = useState<ContactMethod>('call');
-  const [author, setAuthor] = useState<Assignee>('You');
+  const [author, setAuthor] = useState<string>(currentUserId ?? '');
   const [summary, setSummary] = useState('');
   const [error, setError] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
@@ -86,11 +93,11 @@ function LogActivityForm({ deal }: { deal: Deal }) {
           <select
             id="cl-author"
             value={author}
-            onChange={(e) => setAuthor(e.target.value as Assignee)}
+            onChange={(e) => setAuthor(e.target.value)}
           >
-            {ASSIGNEES.map((a) => (
-              <option key={a} value={a}>
-                {a}
+            {authorOptions.map((opt) => (
+              <option key={opt.value || 'unassigned'} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
@@ -310,7 +317,11 @@ function NoteEditor({
 
 function AddNoteForm({ dealId }: { dealId: string }) {
   const { dispatch } = useDeals();
-  const [author, setAuthor] = useState<Assignee>('You');
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+  const currentUserId = user?.id ?? null;
+  const authorOptions = buildAssigneeOptions(members, currentUserId);
+  const [author, setAuthor] = useState<string>(currentUserId ?? '');
   const [content, setContent] = useState('');
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
@@ -356,11 +367,11 @@ function AddNoteForm({ dealId }: { dealId: string }) {
         <select
           id="note-author"
           value={author}
-          onChange={(e) => setAuthor(e.target.value as Assignee)}
+          onChange={(e) => setAuthor(e.target.value)}
         >
-          {ASSIGNEES.map((a) => (
-            <option key={a} value={a}>
-              {a}
+          {authorOptions.map((opt) => (
+            <option key={opt.value || 'unassigned'} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>

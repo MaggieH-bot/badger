@@ -15,7 +15,11 @@ export type Stage =
 // client plans to sell first, buy first, run them in parallel, or hasn't decided.
 export type Sequencing = 'sell_first' | 'buy_first' | 'parallel' | 'unknown';
 
-export type Assignee = 'You' | 'TC' | 'VA' | 'Partner';
+// Assignee values are stored as a workspace-member user_id (uuid) for new
+// assignments, plus an empty string for "Unassigned". Legacy values from
+// pre-V1 imports ('You', 'TC', 'VA', 'Partner', etc.) are preserved as-is —
+// the type is a free string so existing data continues to load.
+export type Assignee = string;
 
 // --- Pipeline category (PRIMARY readiness lens) ---
 

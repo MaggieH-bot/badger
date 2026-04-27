@@ -3,8 +3,11 @@ import type { Deal } from '../../types';
 import { STAGE_LABELS, CATEGORY_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { computeUrgency } from '../../utils/urgency';
 import { computeInsight } from '../../utils/insights';
+import { displayAssignee } from '../../utils/assignee';
 import { InsightPanel } from '../intelligence/InsightPanel';
 import { DetailsTab } from './DetailsTab';
 import { ActivityTab } from './ActivityTab';
@@ -35,6 +38,8 @@ function formatLastContact(iso: string): string {
 export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
   const [activeTab, setActiveTab] = useState<DrawerTab>('details');
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -113,7 +118,7 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
             {STAGE_LABELS[deal.stage]}
           </span>
           <span className="drawer-summary-item">
-            {deal.assignedTo}
+            {displayAssignee(deal.assignedTo, members, user?.id ?? null)}
           </span>
           <span className="drawer-summary-item">{lastContactDisplay}</span>
         </div>
@@ -149,6 +154,16 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
           )}
           {activeTab === 'activity' && <ActivityTab key={deal.id} deal={deal} />}
           {activeTab === 'documents' && <DocumentsTab key={deal.id} deal={deal} />}
+        </div>
+
+        <div className="drawer-footer">
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={onClose}
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

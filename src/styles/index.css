@@ -1175,6 +1175,17 @@ body {
   padding: 20px var(--space-lg);
 }
 
+.drawer-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 12px var(--space-lg);
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
 .drawer-tab-content {
   font-size: 14px;
 }

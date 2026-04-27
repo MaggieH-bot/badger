@@ -1,7 +1,8 @@
 import type { AppRoute, TeamFilter } from '../../types';
-import { ASSIGNEES } from '../../constants/pipeline';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
+import { isLegacyAssignee } from '../../utils/assignee';
 
 interface NavBarProps {
   route: AppRoute;
@@ -15,11 +16,49 @@ const NAV_ITEMS: { route: AppRoute; label: string }[] = [
   { route: '#/closed', label: 'Closed Transactions' },
 ];
 
-const FILTER_OPTIONS: TeamFilter[] = ['All', ...ASSIGNEES];
+interface FilterOption {
+  value: TeamFilter;
+  label: string;
+}
 
 export function NavBar({ route, navigate, onAddDeal }: NavBarProps) {
   const { preferences, dispatch } = useUIPreferences();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { members } = useWorkspaceMembers();
+
+  const currentUserId = user?.id ?? null;
+
+  // Build the Team filter options dynamically from real workspace members.
+  // "All" is always present; current user shows as "You"; others show by email.
+  // If the user has a stale legacy filter persisted (e.g. 'Partner'), surface
+  // it once so the dropdown displays a coherent value rather than blank.
+  const sortedMembers = [...members].sort((a, b) => {
+    if (a.userId === currentUserId) return -1;
+    if (b.userId === currentUserId) return 1;
+    return (a.email ?? a.userId).localeCompare(b.email ?? b.userId);
+  });
+  const filterOptions: FilterOption[] = [
+    { value: 'All', label: 'All' },
+    ...sortedMembers.map((m) => ({
+      value: m.userId as TeamFilter,
+      label:
+        m.userId === currentUserId
+          ? `You${m.email ? ` (${m.email})` : ''}`
+          : m.email ?? 'Workspace member',
+    })),
+  ];
+
+  // If the persisted filter is a legacy hardcoded value (Partner / TC / VA /
+  // 'You' string), append it as a one-time selectable option so the user can
+  // see what's set and clear it. New selections come from real members above.
+  const persisted = preferences.activeTeamFilter;
+  if (
+    persisted !== 'All' &&
+    isLegacyAssignee(persisted) &&
+    !filterOptions.some((opt) => opt.value === persisted)
+  ) {
+    filterOptions.push({ value: persisted, label: `${persisted} (legacy)` });
+  }
 
   return (
     <nav className="navbar">
@@ -80,9 +119,9 @@ export function NavBar({ route, navigate, onAddDeal }: NavBarProps) {
               })
             }
           >
-            {FILTER_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+            {filterOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>

@@ -3,6 +3,9 @@ import {
   STAGE_LABELS,
   OPPORTUNITY_TYPE_LABELS,
 } from '../../constants/pipeline';
+import { useAuth } from '../../store/useAuth';
+import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
+import { displayAssignee } from '../../utils/assignee';
 
 interface DealCardProps {
   deal: DealWithUrgency;
@@ -41,6 +44,9 @@ function dueLabel(due: string): string {
 }
 
 export function DealCard({ deal, onClick }: DealCardProps) {
+  const { user } = useAuth();
+  const { members } = useWorkspaceMembers();
+
   const daysLabel = deal.neverContacted
     ? 'Never contacted'
     : deal.daysSinceContact === 0
@@ -52,6 +58,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
   const isClosed = deal.stage === 'closed';
   const showAttention = deal.followUpStatus === 'needs_attention';
   const price = priceSummary(deal);
+  const assigneeLabel = displayAssignee(deal.assignedTo, members, user?.id ?? null);
 
   return (
     <button
@@ -81,7 +88,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
           <span>{deal.probability}%</span>
         )}
         <span>{STAGE_LABELS[deal.stage]}</span>
-        <span>{deal.assignedTo}</span>
+        <span>{assigneeLabel}</span>
         <span>{daysLabel}</span>
         {price && <span>{price}</span>}
       </div>
