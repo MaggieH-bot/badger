@@ -127,6 +127,12 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
   const showClosedPrice = shouldShowClosedPrice(form.stage);
   const showSequencing = typeOrUndef === 'both';
 
+  // Tracks whether the user just clicked Mark Done — drives the helper text
+  // and lets the checkbox stay in a checked state after clearing the inputs.
+  // Auto-flips back to false the moment the user types a new Next Step or
+  // picks a new Due Date.
+  const [markedDone, setMarkedDone] = useState(false);
+
   function handleChange<K extends keyof ReturnType<typeof initForm>>(
     field: K,
     value: ReturnType<typeof initForm>[K],
@@ -139,16 +145,22 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     if (errors.probability && field === 'probability') {
       setErrors((prev) => ({ ...prev, probability: undefined }));
     }
+    if (markedDone && (field === 'nextStep' || field === 'nextStepDue')) {
+      setMarkedDone(false);
+    }
   }
 
-  // Mark the current Next Step complete by clearing both the next-step text
-  // and the due date in form state. The user can then either type a new
-  // Next Step + Due Date and Save Changes (record disappears from Today, or
-  // moves to a different bucket), or just Save Changes (record moves to
-  // the Needs Step bucket on Today).
-  function handleMarkComplete() {
+  // Toggling Mark Done clears Next Step + Due Date when checked; unchecking
+  // leaves the cleared inputs alone (the user can simply type a new value
+  // or pick a date, which also auto-unchecks via handleChange).
+  function handleMarkDoneToggle() {
+    if (markedDone) {
+      setMarkedDone(false);
+      return;
+    }
     userTouchedRef.current = true;
     setForm((f) => ({ ...f, nextStep: '', nextStepDue: '' }));
+    setMarkedDone(true);
   }
 
   const hasNextStep = form.nextStep.trim() !== '' || form.nextStepDue !== '';
@@ -308,7 +320,7 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
         </div>
 
         <div id="anchor-next-step" className="next-step-block">
-          <div className="form-row">
+          <div className="form-row form-row--next-step">
             <div className="form-field">
               <label htmlFor="dt-nextStep">Next Step</label>
               <input
@@ -328,26 +340,26 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
                 onChange={(e) => handleChange('nextStepDue', e.target.value)}
               />
             </div>
+            <div className="form-field next-step-mark">
+              <span className="form-field-spacer" aria-hidden="true">&nbsp;</span>
+              <label className="next-step-mark-label">
+                <input
+                  type="checkbox"
+                  id="dt-markDone"
+                  checked={markedDone}
+                  disabled={!hasNextStep && !markedDone}
+                  onChange={handleMarkDoneToggle}
+                />
+                <span>Mark Done</span>
+              </label>
+            </div>
           </div>
-          <div className="next-step-actions">
-            <button
-              type="button"
-              className="btn-link"
-              onClick={handleMarkComplete}
-              disabled={!hasNextStep}
-              title={
-                hasNextStep
-                  ? 'Clears the current Next Step and Due Date. Add a new one above or click Save Changes to leave empty.'
-                  : 'No active Next Step to complete.'
-              }
-            >
-              ✓ Mark Complete
-            </button>
-            <span className="next-step-hint">
-              Clears Next Step + Due Date. Add the next action above, or Save to
-              leave empty.
-            </span>
-          </div>
+          {markedDone && (
+            <p className="next-step-done-hint" role="status">
+              Done. Add the next step before saving, or save blank to move this
+              client to Needs Step.
+            </p>
+          )}
         </div>
       </section>
 
