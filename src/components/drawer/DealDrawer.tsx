@@ -1,22 +1,32 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Deal } from '../../types';
-import { STAGE_LABELS, CATEGORY_LABELS } from '../../constants/pipeline';
+import { OPPORTUNITY_TYPE_LABELS, STAGE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
-import { computeUrgency } from '../../utils/urgency';
-import { computeInsight } from '../../utils/insights';
 import { displayAssignee } from '../../utils/assignee';
-import { InsightPanel } from '../intelligence/InsightPanel';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
-import { ActivityTab } from './ActivityTab';
+import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
 
-type DrawerTab = 'details' | 'activity' | 'documents';
+type SectionKey =
+  | 'overview'
+  | 'contact'
+  | 'status'
+  | 'property-price'
+  | 'more-info'
+  | 'activity'
+  | 'notes'
+  | 'documents';
 
-const TABS: { key: DrawerTab; label: string }[] = [
-  { key: 'details', label: 'Details' },
+const SECTIONS: { key: SectionKey; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'status', label: 'Status' },
+  { key: 'property-price', label: 'Property / Price' },
+  { key: 'more-info', label: 'More Info' },
   { key: 'activity', label: 'Activity' },
+  { key: 'notes', label: 'Notes' },
   { key: 'documents', label: 'Documents' },
 ];
 
@@ -25,45 +35,102 @@ interface DealDrawerProps {
   onClose: () => void;
 }
 
-function formatLastContact(iso: string): string {
+function formatLastUpdated(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   });
 }
 
 export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
-  const { deals } = useDeals();
+  const { deals, dispatch } = useDeals();
   const { preferences } = useUIPreferences();
   const { members } = useWorkspaceMembers();
-  const [activeTab, setActiveTab] = useState<DrawerTab>('details');
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] = useState<SectionKey>('overview');
+  const [savedFlash, setSavedFlash] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<DetailsTabHandle>(null);
+  const activityRef = useRef<ActivityTabHandle>(null);
 
   const deal: Deal | undefined = deals.find((d) => d.id === dealId);
 
-  // requestClose checks for unsaved Details edits and prompts before closing.
-  // Used by the X, the Close button, click-outside, and the auto-close
-  // effects (where prompting doesn't apply — we just call onClose directly).
+  // The workspace treats the client record as one save unit: every editable
+  // field across Overview / Contact / Status / Property-Price / More Info
+  // commits together via Save Changes. Activity, Notes, and Documents keep
+  // their own add/upload actions and don't gate the save flow.
+  function isAnyDirty(): boolean {
+    return (
+      (detailsRef.current?.isDirty() ?? false) ||
+      (activityRef.current?.isMoreInfoDirty() ?? false)
+    );
+  }
+
+  // requestClose is the only close path — used by the X, Cancel, click-outside,
+  // and the auto-close effects (where prompting is skipped because the deal
+  // is already gone or filtered out).
   function requestClose() {
-    if (detailsRef.current?.isDirty()) {
+    if (isAnyDirty()) {
       const ok = window.confirm('Discard unsaved changes?');
       if (!ok) return;
     }
     onClose();
   }
 
-  // Switching tabs while Details has unsaved edits would unmount DetailsTab
-  // and lose the form state silently. Prompt before switching away.
-  function requestTabChange(next: DrawerTab) {
-    if (next === activeTab) return;
-    if (activeTab === 'details' && detailsRef.current?.isDirty()) {
-      const ok = window.confirm('Discard unsaved changes?');
-      if (!ok) return;
+  // Unified save: validate Details, merge Details + More Info patches into a
+  // single UPDATE_DEAL, flash, then auto-close. If validation fails, jump to
+  // the Overview section so the user sees the inline error.
+  function handleSaveAll() {
+    if (!deal) return;
+
+    const detailsDirty = detailsRef.current?.isDirty() ?? false;
+    const moreInfoDirty = activityRef.current?.isMoreInfoDirty() ?? false;
+    if (!detailsDirty && !moreInfoDirty) {
+      onClose();
+      return;
     }
-    setActiveTab(next);
+
+    const ok = detailsRef.current?.validate() ?? true;
+    if (!ok) {
+      jumpToSection('overview');
+      return;
+    }
+
+    const detailsPatch = detailsRef.current?.getPatch() ?? {};
+    const moreInfoPatch = activityRef.current?.getMoreInfoPatch() ?? {};
+
+    dispatch({
+      type: 'UPDATE_DEAL',
+      deal: { ...deal, ...detailsPatch, ...moreInfoPatch },
+    });
+
+    detailsRef.current?.markSaved();
+    activityRef.current?.markMoreInfoSaved();
+
+    setSavedFlash(true);
+    window.setTimeout(() => onClose(), 800);
+  }
+
+  function handleDelete() {
+    if (!deal) return;
+    const ok = window.confirm(
+      `Delete ${deal.clientName}? This removes all contact history, notes, and documents and cannot be undone.`,
+    );
+    if (!ok) return;
+    dispatch({ type: 'DELETE_DEAL', dealId: deal.id });
+    onClose();
+  }
+
+  function jumpToSection(key: SectionKey) {
+    setActiveSection(key);
+    const el = mainRef.current?.querySelector(`#section-${key}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   // Auto-close if deal no longer exists (data-driven; no prompt).
@@ -84,14 +151,15 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
     }
   }, [deal, preferences.activeTeamFilter, onClose]);
 
-  // Click-outside to close (uses requestClose so unsaved edits prompt first).
+  // Click-outside (the dim overlay) closes the workspace, with the same
+  // discard prompt as the X.
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
-        drawerRef.current &&
-        !drawerRef.current.contains(e.target as Node)
+        modalRef.current &&
+        !modalRef.current.contains(e.target as Node)
       ) {
-        if (detailsRef.current?.isDirty()) {
+        if (isAnyDirty()) {
           const ok = window.confirm('Discard unsaved changes?');
           if (!ok) return;
         }
@@ -104,107 +172,122 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
 
   if (!deal) return null;
 
-  const withUrgency = computeUrgency(deal);
-  const daysLabel =
-    withUrgency.daysSinceContact === 0
-      ? 'today'
-      : withUrgency.daysSinceContact === 1
-        ? '1 day ago'
-        : `${withUrgency.daysSinceContact} days ago`;
-  const lastContactDisplay = withUrgency.neverContacted
-    ? 'Last contact: never logged'
-    : `Last contact: ${formatLastContact(deal.lastContact!)} (${daysLabel})`;
+  const isClosed = deal.stage === 'closed';
+  const oppLabel = deal.opportunityType
+    ? OPPORTUNITY_TYPE_LABELS[deal.opportunityType]
+    : null;
+  const assigneeLabel = displayAssignee(deal.assignedTo, members);
+  const subtitleParts: string[] = [];
+  if (oppLabel) subtitleParts.push(oppLabel);
+  if (!isClosed) subtitleParts.push(STAGE_LABELS[deal.stage]);
+  if (assigneeLabel) subtitleParts.push(`Assigned to ${assigneeLabel}`);
 
   return (
-    <div className="drawer-overlay">
-      <div className="drawer" ref={drawerRef}>
-        <div className="drawer-header">
-          <div className="drawer-header-info">
-            <h2 className="drawer-title">{deal.clientName}</h2>
-            {deal.address && (
-              <p className="drawer-subtitle">{deal.address}</p>
+    <div className="workspace-overlay">
+      <div className="workspace-modal" ref={modalRef}>
+        <header className="workspace-header">
+          <div className="workspace-header-info">
+            <div className="workspace-title-row">
+              <h2 className="workspace-title">{deal.clientName}</h2>
+              {isClosed && (
+                <span className="status-badge status-badge--closed">Closed</span>
+              )}
+            </div>
+            {subtitleParts.length > 0 && (
+              <p className="workspace-subtitle">{subtitleParts.join(' • ')}</p>
             )}
           </div>
           <button
-            className="drawer-close"
+            className="workspace-close"
             onClick={requestClose}
             type="button"
-            aria-label="Close drawer"
+            aria-label="Close client record"
           >
             &times;
           </button>
-        </div>
+        </header>
 
-        <div className="drawer-summary">
-          {deal.stage === 'closed' ? (
-            <span className="status-badge status-badge--closed">Closed</span>
-          ) : (
-            <span className={`category-badge category-badge--${deal.category}`}>
-              {CATEGORY_LABELS[deal.category]}
-            </span>
-          )}
-          {deal.stage !== 'closed' && (
-            <span className="drawer-summary-item">
-              {STAGE_LABELS[deal.stage]}
-            </span>
-          )}
-          <span className="drawer-summary-item">
-            {displayAssignee(deal.assignedTo, members)}
-          </span>
-          <span className="drawer-summary-item">{lastContactDisplay}</span>
-        </div>
+        <div className="workspace-body">
+          <nav className="workspace-nav" aria-label="Client record sections">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={
+                  activeSection === s.key
+                    ? 'workspace-nav-item workspace-nav-item--active'
+                    : 'workspace-nav-item'
+                }
+                onClick={() => jumpToSection(s.key)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </nav>
 
-        {deal.stage !== 'closed' && (
-          <div className="drawer-insight">
-            <InsightPanel insight={computeInsight(withUrgency)} variant="compact" />
-          </div>
-        )}
-
-        <div className="drawer-tabs">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              className={`drawer-tab${activeTab === tab.key ? ' drawer-tab--active' : ''}`}
-              onClick={() => requestTabChange(tab.key)}
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="drawer-body">
-          {activeTab === 'details' && (
+          <main className="workspace-main" ref={mainRef}>
             <DetailsTab
               key={deal.id}
               ref={detailsRef}
               deal={deal}
-              onDeleted={onClose}
-              onOpenActivity={() => requestTabChange('activity')}
+              onRequestSave={handleSaveAll}
             />
-          )}
-          {activeTab === 'activity' && <ActivityTab key={deal.id} deal={deal} />}
-          {activeTab === 'documents' && <DocumentsTab key={deal.id} deal={deal} />}
+            <ActivityTab
+              key={`${deal.id}-activity`}
+              ref={activityRef}
+              deal={deal}
+              onRequestSave={handleSaveAll}
+            />
+            <DocumentsTab key={`${deal.id}-docs`} deal={deal} />
+
+            <section className="record-section danger-zone">
+              <h3 className="record-section-title">Danger zone</h3>
+              <div className="danger-zone-row">
+                <div className="danger-zone-copy">
+                  <p className="danger-zone-heading">Delete this client</p>
+                  <p className="danger-zone-detail">
+                    Permanently removes {deal.clientName}, including contact
+                    history, notes, and documents.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  onClick={handleDelete}
+                >
+                  Delete Client
+                </button>
+              </div>
+            </section>
+          </main>
         </div>
 
-        <div className="drawer-footer">
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={requestClose}
-          >
-            Close
-          </button>
-          {activeTab === 'details' && (
+        <footer className="workspace-footer">
+          <span className="workspace-footer-meta">
+            Last updated: {formatLastUpdated(deal.updatedAt)}
+          </span>
+          <div className="workspace-footer-actions">
+            {savedFlash && (
+              <span className="form-saved-flash" role="status">
+                Saved.
+              </span>
+            )}
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={requestClose}
+            >
+              Cancel
+            </button>
             <button
               type="button"
               className="btn btn--primary"
-              onClick={() => detailsRef.current?.save()}
+              onClick={handleSaveAll}
             >
               Save Changes
             </button>
-          )}
-        </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

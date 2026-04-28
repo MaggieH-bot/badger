@@ -17,7 +17,6 @@ import {
   SEQUENCING_OPTIONS,
   SEQUENCING_LABELS,
 } from '../../constants/pipeline';
-import { useDeals } from '../../store/useDeals';
 import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { buildAssigneeOptions, normalizeAssigneeForForm } from '../../utils/assignee';
@@ -30,15 +29,17 @@ import {
 
 interface DetailsTabProps {
   deal: Deal;
-  onDeleted: () => void;
-  onOpenActivity: () => void;
+  onRequestSave: () => void;
 }
 
-// Imperative handle exposed to the drawer footer so the global Save Changes
-// button can drive this tab's save logic, and the Close prompt can ask
-// whether the form has unsaved edits.
+// Imperative handle the drawer uses to drive the unified Save Changes flow.
+// The drawer calls validate() first; if it passes, getPatch() returns the
+// fields to merge into the UPDATE_DEAL payload and markSaved() resets the
+// dirty flag. isDirty() drives the X-discard prompt.
 export interface DetailsTabHandle {
-  save: () => void;
+  validate: () => boolean;
+  getPatch: () => Partial<Deal>;
+  markSaved: () => void;
   isDirty: () => boolean;
 }
 
@@ -84,20 +85,17 @@ function initForm(deal: Deal) {
     priceRangeHigh: deal.priceRangeHigh !== undefined ? String(deal.priceRangeHigh) : '',
     closedPrice: deal.closedPrice !== undefined ? String(deal.closedPrice) : '',
     sequencing: (deal.sequencing ?? '') as Sequencing | '',
-    comments: deal.comments ?? '',
   };
 }
 
 export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
-  function DetailsTab({ deal, onDeleted, onOpenActivity }, ref) {
-  const { dispatch } = useDeals();
+  function DetailsTab({ deal, onRequestSave }, ref) {
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
-  const [savedFlash, setSavedFlash] = useState(false);
   // Tracks whether the user has typed in any field since the last save. Used
-  // by the drawer footer to decide whether Close needs to confirm.
+  // by the drawer footer to decide whether the X needs to confirm discard.
   const userTouchedRef = useRef(false);
 
   const currentUserId = user?.id ?? null;
@@ -143,96 +141,83 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     }
   }
 
-  // performSave handles validation + dispatch. Drawer footer's Save Changes
-  // button calls this through the imperative handle below.
-  function performSave(): boolean {
+  // validate() runs the form-level checks, sets error state, and returns
+  // whether the form is OK to save. The drawer calls this before getPatch().
+  function validate(): boolean {
     const trimmedName = form.clientName.trim();
     const newErrors: typeof errors = {};
 
     if (!trimmedName) newErrors.clientName = 'Client name is required.';
 
     const probTrim = form.probability.trim();
-    let parsedProbability: number | undefined;
     if (probTrim) {
-      parsedProbability = parseProbability(probTrim);
-      if (parsedProbability === undefined) {
+      const parsed = parseProbability(probTrim);
+      if (parsed === undefined) {
         newErrors.probability = 'Probability must be an integer between 0 and 100.';
       }
     }
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return false;
-    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
 
+  // getPatch() builds the UPDATE_DEAL payload fragment for this tab's fields.
+  // Caller is expected to validate() first; this assumes the form is valid.
+  function getPatch(): Partial<Deal> {
+    const trimmedName = form.clientName.trim();
+    const probTrim = form.probability.trim();
+    const parsedProbability = probTrim ? parseProbability(probTrim) : undefined;
     const dueIso = form.nextStepDue.trim()
       ? new Date(form.nextStepDue).toISOString()
       : undefined;
 
-    dispatch({
-      type: 'UPDATE_DEAL',
-      deal: {
-        ...deal,
-        clientName: trimmedName,
-        category: form.category,
-        opportunityType: typeOrUndef,
-        probability: parsedProbability,
-        comments: form.comments.trim() || undefined,
-        stage: form.stage,
-        assignedTo: form.assignedTo,
-        nextStep: form.nextStep.trim() || undefined,
-        nextStepDue: dueIso,
-        address: showAddress ? (form.address.trim() || undefined) : undefined,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
-        listPrice: showListPrice ? parseNumber(form.listPrice) : undefined,
-        priceRangeLow: showPriceRange ? parseNumber(form.priceRangeLow) : undefined,
-        priceRangeHigh: showPriceRange ? parseNumber(form.priceRangeHigh) : undefined,
-        closedPrice: showClosedPrice ? parseNumber(form.closedPrice) : undefined,
-        sequencing: showSequencing && form.sequencing ? form.sequencing : undefined,
-      },
-    });
-
-    userTouchedRef.current = false;
-    setSavedFlash(true);
-    window.setTimeout(() => setSavedFlash(false), 2000);
-    return true;
+    return {
+      clientName: trimmedName,
+      category: form.category,
+      opportunityType: typeOrUndef,
+      probability: parsedProbability,
+      stage: form.stage,
+      assignedTo: form.assignedTo,
+      nextStep: form.nextStep.trim() || undefined,
+      nextStepDue: dueIso,
+      address: showAddress ? (form.address.trim() || undefined) : undefined,
+      phone: form.phone.trim() || undefined,
+      email: form.email.trim() || undefined,
+      listPrice: showListPrice ? parseNumber(form.listPrice) : undefined,
+      priceRangeLow: showPriceRange ? parseNumber(form.priceRangeLow) : undefined,
+      priceRangeHigh: showPriceRange ? parseNumber(form.priceRangeHigh) : undefined,
+      closedPrice: showClosedPrice ? parseNumber(form.closedPrice) : undefined,
+      sequencing: showSequencing && form.sequencing ? form.sequencing : undefined,
+    };
   }
 
   useImperativeHandle(
     ref,
     () => ({
-      save: () => {
-        performSave();
+      validate,
+      getPatch,
+      markSaved: () => {
+        userTouchedRef.current = false;
       },
       isDirty: () => userTouchedRef.current,
     }),
-    // performSave is recreated each render; that's fine — the latest closure
-    // is what the footer should call.
+    // validate / getPatch are recreated each render; that's fine — the latest
+    // closure is what the footer should call.
   );
 
-  function handleDelete() {
-    const ok = window.confirm(
-      `Delete ${deal.clientName}? This removes all contact history, notes, and documents and cannot be undone.`,
-    );
-    if (!ok) return;
-    dispatch({ type: 'DELETE_DEAL', dealId: deal.id });
-    onDeleted();
-  }
-
   return (
-    <div className="drawer-tab-content">
-      <form
-        className="deal-form"
-        onSubmit={(e) => {
-          // Saving happens via the drawer footer's Save Changes button.
-          // Suppress implicit form submission (e.g. Enter inside an input)
-          // so it doesn't reload the page or skip validation.
-          e.preventDefault();
-          performSave();
-        }}
-      >
-        <h3 className="form-group-title">Identity & Pipeline</h3>
+    <form
+      className="deal-form"
+      onSubmit={(e) => {
+        // Saving runs through the workspace footer's Save Changes button so
+        // every editable client field commits as a single update. Enter
+        // inside an input still triggers it via this onSubmit.
+        e.preventDefault();
+        onRequestSave();
+      }}
+    >
+      <section id="section-overview" className="record-section">
+        <h3 className="record-section-title">Overview</h3>
 
         <div className="form-field">
           <label htmlFor="dt-clientName">Client Name *</label>
@@ -243,6 +228,40 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             onChange={(e) => handleChange('clientName', e.target.value)}
           />
           {errors.clientName && <span className="form-error">{errors.clientName}</span>}
+        </div>
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="dt-opportunityType">Opportunity Type</label>
+            <select
+              id="dt-opportunityType"
+              value={form.opportunityType}
+              onChange={(e) =>
+                handleChange('opportunityType', e.target.value as OpportunityType | '')
+              }
+            >
+              <option value="">Select type…</option>
+              {OPPORTUNITY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {OPPORTUNITY_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field">
+            <label htmlFor="dt-stage">Stage *</label>
+            <select
+              id="dt-stage"
+              value={form.stage}
+              onChange={(e) => handleChange('stage', e.target.value as typeof form.stage)}
+            >
+              {validStages.map((s) => (
+                <option key={s} value={s}>
+                  {STAGE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="form-row">
@@ -261,22 +280,87 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             </select>
           </div>
           <div className="form-field">
-            <label htmlFor="dt-opportunityType">Opportunity Type</label>
+            <label htmlFor="dt-assignedTo">Assigned To</label>
             <select
-              id="dt-opportunityType"
-              value={form.opportunityType}
-              onChange={(e) =>
-                handleChange('opportunityType', e.target.value as OpportunityType | '')
-              }
+              id="dt-assignedTo"
+              value={form.assignedTo}
+              onChange={(e) => handleChange('assignedTo', e.target.value)}
             >
-              <option value="">Select type…</option>
-              {OPPORTUNITY_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {OPPORTUNITY_TYPE_LABELS[t]}
+              {assigneeOptions.map((opt) => (
+                <option key={opt.value || 'unassigned'} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="dt-nextStep">Next Step</label>
+            <input
+              id="dt-nextStep"
+              type="text"
+              placeholder="e.g. Send comps, schedule walkthrough"
+              value={form.nextStep}
+              onChange={(e) => handleChange('nextStep', e.target.value)}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="dt-nextStepDue">Due</label>
+            <input
+              id="dt-nextStepDue"
+              type="date"
+              value={form.nextStepDue}
+              onChange={(e) => handleChange('nextStepDue', e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section id="section-contact" className="record-section">
+        <h3 className="record-section-title">Contact</h3>
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="dt-phone">Phone</label>
+            <input
+              id="dt-phone"
+              type="tel"
+              value={form.phone}
+              onChange={(e) => handleChange('phone', e.target.value)}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="dt-email">Email</label>
+            <input
+              id="dt-email"
+              type="email"
+              value={form.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section id="section-status" className="record-section">
+        <h3 className="record-section-title">Status</h3>
+
+        <div className="form-field">
+          <label htmlFor="dt-probability">Probability</label>
+          <div className="form-suffix-input form-suffix-input--narrow">
+            <input
+              id="dt-probability"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={form.probability}
+              onChange={(e) => handleChange('probability', e.target.value)}
+            />
+            <span className="form-suffix">%</span>
+          </div>
+          {errors.probability && <span className="form-error">{errors.probability}</span>}
         </div>
 
         {showSequencing && (
@@ -305,104 +389,15 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             </div>
           </>
         )}
+      </section>
 
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="dt-stage">Stage *</label>
-            <select
-              id="dt-stage"
-              value={form.stage}
-              onChange={(e) => handleChange('stage', e.target.value as typeof form.stage)}
-            >
-              {validStages.map((s) => (
-                <option key={s} value={s}>
-                  {STAGE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-field">
-            <label htmlFor="dt-assignedTo">Assigned To</label>
-            <select
-              id="dt-assignedTo"
-              value={form.assignedTo}
-              onChange={(e) => handleChange('assignedTo', e.target.value)}
-            >
-              {assigneeOptions.map((opt) => (
-                <option key={opt.value || 'unassigned'} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      <section id="section-property-price" className="record-section">
+        <h3 className="record-section-title">Property / Price</h3>
 
-        <div className="form-field">
-          <label htmlFor="dt-probability">Probability</label>
-          <div className="form-suffix-input form-suffix-input--narrow">
-            <input
-              id="dt-probability"
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={form.probability}
-              onChange={(e) => handleChange('probability', e.target.value)}
-            />
-            <span className="form-suffix">%</span>
-          </div>
-          {errors.probability && <span className="form-error">{errors.probability}</span>}
-        </div>
-
-        <h3 className="form-group-title">Next Step</h3>
-
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="dt-nextStep">Next Step</label>
-            <input
-              id="dt-nextStep"
-              type="text"
-              placeholder="e.g. Send comps, schedule walkthrough"
-              value={form.nextStep}
-              onChange={(e) => handleChange('nextStep', e.target.value)}
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="dt-nextStepDue">Due</label>
-            <input
-              id="dt-nextStepDue"
-              type="date"
-              value={form.nextStepDue}
-              onChange={(e) => handleChange('nextStepDue', e.target.value)}
-            />
-          </div>
-        </div>
-
-        <h3 className="form-group-title">Contact</h3>
-
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="dt-phone">Phone</label>
-            <input
-              id="dt-phone"
-              type="tel"
-              value={form.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="dt-email">Email</label>
-            <input
-              id="dt-email"
-              type="email"
-              value={form.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-            />
-          </div>
-        </div>
-
-        {(showAddress || showListPrice || showPriceRange || showClosedPrice) && (
-          <h3 className="form-group-title">Property &amp; Price</h3>
+        {!showAddress && !showListPrice && !showPriceRange && !showClosedPrice && (
+          <p className="record-section-hint">
+            Set an Opportunity Type and Stage to enter property and price details.
+          </p>
         )}
 
         {showAddress && (
@@ -471,53 +466,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             />
           </div>
         )}
-
-        <div className="form-field">
-          <label htmlFor="dt-comments">Comments</label>
-          <textarea
-            id="dt-comments"
-            className="note-textarea"
-            rows={3}
-            placeholder="Short context for this client — for longer entries, use Notes."
-            value={form.comments}
-            onChange={(e) => handleChange('comments', e.target.value)}
-          />
-        </div>
-
-        <button
-          type="button"
-          className="details-activity-link"
-          onClick={onOpenActivity}
-        >
-          View Activity & More Info →
-        </button>
-
-        {savedFlash && (
-          <p className="form-saved-flash" role="status">
-            Saved.
-          </p>
-        )}
-      </form>
-
-      <section className="danger-zone">
-        <h3 className="danger-zone-title">Danger zone</h3>
-        <div className="danger-zone-row">
-          <div className="danger-zone-copy">
-            <p className="danger-zone-heading">Delete this client</p>
-            <p className="danger-zone-detail">
-              Permanently removes {deal.clientName}, including contact history, notes, and documents.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn--danger"
-            onClick={handleDelete}
-          >
-            Delete Client
-          </button>
-        </div>
       </section>
-    </div>
+    </form>
   );
   },
 );

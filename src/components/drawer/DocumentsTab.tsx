@@ -503,24 +503,22 @@ function DocumentItem({ dealId, doc }: { dealId: string; doc: DocType }) {
 
 export function DocumentsTab({ deal }: DocumentsTabProps) {
   return (
-    <div className="drawer-tab-content">
-      <section className="tab-section">
-        <h3 className="tab-section-title">Documents</h3>
-        <p className="tab-section-help">
-          Attach a PDF (up to 25 MB) or write notes — both are optional, but at
-          least one is required. Files open via a short-lived secure link.
-        </p>
-        <AddDocumentForm dealId={deal.id} />
-        {deal.documents.length === 0 ? (
-          <p className="empty-state empty-state--spaced">No documents yet.</p>
-        ) : (
-          <div className="doc-list">
-            {deal.documents.map((doc) => (
-              <DocumentItem key={doc.id} dealId={deal.id} doc={doc} />
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+    <section id="section-documents" className="record-section">
+      <h3 className="record-section-title">Documents</h3>
+      <p className="record-section-hint">
+        Attach a PDF (up to 25 MB) or write notes — both are optional, but at
+        least one is required. Files open via a short-lived secure link.
+      </p>
+      <AddDocumentForm dealId={deal.id} />
+      {deal.documents.length === 0 ? (
+        <p className="empty-state empty-state--spaced">No documents yet.</p>
+      ) : (
+        <div className="doc-list">
+          {deal.documents.map((doc) => (
+            <DocumentItem key={doc.id} dealId={deal.id} doc={doc} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

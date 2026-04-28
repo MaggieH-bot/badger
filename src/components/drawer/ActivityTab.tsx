@@ -1,4 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import type { Deal, ContactMethod, Note as NoteType } from '../../types';
 import { CONTACT_METHODS, CONTACT_METHOD_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
@@ -9,6 +15,22 @@ import { generateId } from '../../utils/ids';
 
 interface ActivityTabProps {
   deal: Deal;
+  onRequestSave: () => void;
+}
+
+// Imperative handle the drawer uses to fold More Info edits into the unified
+// Save Changes flow. Log Activity entries and Notes still commit on their
+// own (independent actions, not part of the client-record patch).
+export interface ActivityTabHandle {
+  getMoreInfoPatch: () => Partial<Deal>;
+  markMoreInfoSaved: () => void;
+  isMoreInfoDirty: () => boolean;
+}
+
+interface MoreInfoFormHandle {
+  getPatch: () => Partial<Deal>;
+  markSaved: () => void;
+  isDirty: () => boolean;
 }
 
 function formatTimestamp(iso: string): string {
@@ -89,7 +111,7 @@ function LogActivityForm({ deal }: { deal: Deal }) {
           </select>
         </div>
         <div className="form-field">
-          <label htmlFor="cl-author">Author</label>
+          <label htmlFor="cl-author">Logged By</label>
           <select
             id="cl-author"
             value={author}
@@ -140,121 +162,117 @@ function initMoreInfo(deal: Deal) {
     motivation: deal.motivation ?? '',
     blocker: deal.blocker ?? '',
     leadSource: deal.leadSource ?? '',
+    comments: deal.comments ?? '',
   };
 }
 
-function MoreInfoForm({ deal }: { deal: Deal }) {
-  const { dispatch } = useDeals();
-  const [form, setForm] = useState(() => initMoreInfo(deal));
-  const [savedFlash, setSavedFlash] = useState(false);
+interface MoreInfoFormProps {
+  deal: Deal;
+  onRequestSave: () => void;
+}
 
-  const initial = initMoreInfo(deal);
-  const dirty =
-    form.targetTimeframe !== initial.targetTimeframe ||
-    form.areaOfInterest !== initial.areaOfInterest ||
-    form.motivation !== initial.motivation ||
-    form.blocker !== initial.blocker ||
-    form.leadSource !== initial.leadSource;
+const MoreInfoForm = forwardRef<MoreInfoFormHandle, MoreInfoFormProps>(
+  function MoreInfoForm({ deal, onRequestSave }, ref) {
+    const [form, setForm] = useState(() => initMoreInfo(deal));
+    // Tracks whether the user has typed since the last save. The drawer reads
+    // this via the handle to decide whether the X needs to confirm discard.
+    const userTouchedRef = useRef(false);
 
-  function handleChange(field: keyof ReturnType<typeof initMoreInfo>, value: string) {
-    setForm((f) => ({ ...f, [field]: value }));
-    if (savedFlash) setSavedFlash(false);
-  }
+    function handleChange(field: keyof ReturnType<typeof initMoreInfo>, value: string) {
+      userTouchedRef.current = true;
+      setForm((f) => ({ ...f, [field]: value }));
+    }
 
-  function handleCancel() {
-    setForm(initMoreInfo(deal));
-    setSavedFlash(false);
-  }
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    dispatch({
-      type: 'UPDATE_DEAL',
-      deal: {
-        ...deal,
+    useImperativeHandle(ref, () => ({
+      getPatch: () => ({
         targetTimeframe: form.targetTimeframe.trim() || undefined,
         areaOfInterest: form.areaOfInterest.trim() || undefined,
         motivation: form.motivation.trim() || undefined,
         blocker: form.blocker.trim() || undefined,
         leadSource: form.leadSource.trim() || undefined,
+        comments: form.comments.trim() || undefined,
+      }),
+      markSaved: () => {
+        userTouchedRef.current = false;
       },
-    });
-    setSavedFlash(true);
-  }
+      isDirty: () => userTouchedRef.current,
+    }));
 
-  return (
-    <form className="more-info-form" onSubmit={handleSubmit}>
-      <div className="form-field">
-        <label htmlFor="mi-targetTimeframe">Target Timeframe</label>
-        <input
-          id="mi-targetTimeframe"
-          type="text"
-          placeholder="e.g. March 2026, Spring, This summer"
-          value={form.targetTimeframe}
-          onChange={(e) => handleChange('targetTimeframe', e.target.value)}
-        />
-      </div>
-      <div className="form-field">
-        <label htmlFor="mi-areaOfInterest">Area of Interest</label>
-        <input
-          id="mi-areaOfInterest"
-          type="text"
-          placeholder="e.g. West Side, Lakeview"
-          value={form.areaOfInterest}
-          onChange={(e) => handleChange('areaOfInterest', e.target.value)}
-        />
-      </div>
-      <div className="form-field">
-        <label htmlFor="mi-motivation">Motivation</label>
-        <input
-          id="mi-motivation"
-          type="text"
-          placeholder="e.g. growing family, downsizing"
-          value={form.motivation}
-          onChange={(e) => handleChange('motivation', e.target.value)}
-        />
-      </div>
-      <div className="form-field">
-        <label htmlFor="mi-blocker">Blocker</label>
-        <input
-          id="mi-blocker"
-          type="text"
-          placeholder="e.g. needs to sell first, financing"
-          value={form.blocker}
-          onChange={(e) => handleChange('blocker', e.target.value)}
-        />
-      </div>
-      <div className="form-field">
-        <label htmlFor="mi-leadSource">Lead Source</label>
-        <input
-          id="mi-leadSource"
-          type="text"
-          placeholder="e.g. referral from Mike"
-          value={form.leadSource}
-          onChange={(e) => handleChange('leadSource', e.target.value)}
-        />
-      </div>
-      <div className="form-actions">
-        <button
-          type="button"
-          className="btn btn--secondary"
-          onClick={handleCancel}
-          disabled={!dirty}
-        >
-          Cancel
-        </button>
-        <button type="submit" className="btn btn--primary" disabled={!dirty}>
-          Save More Info
-        </button>
-        {savedFlash && !dirty && (
-          <span className="form-saved-flash" role="status">
-            Saved.
-          </span>
-        )}
-      </div>
-    </form>
-  );
-}
+    return (
+      <form
+        className="more-info-form"
+        onSubmit={(e) => {
+          // Saving runs through the drawer's unified Save Changes; Enter
+          // inside any field triggers it via this onSubmit.
+          e.preventDefault();
+          onRequestSave();
+        }}
+      >
+        <div className="form-field">
+          <label htmlFor="mi-targetTimeframe">Target Timeframe</label>
+          <input
+            id="mi-targetTimeframe"
+            type="text"
+            placeholder="e.g. March 2026, Spring, This summer"
+            value={form.targetTimeframe}
+            onChange={(e) => handleChange('targetTimeframe', e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="mi-areaOfInterest">Area of Interest</label>
+          <input
+            id="mi-areaOfInterest"
+            type="text"
+            placeholder="e.g. West Side, Lakeview"
+            value={form.areaOfInterest}
+            onChange={(e) => handleChange('areaOfInterest', e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="mi-motivation">Motivation</label>
+          <input
+            id="mi-motivation"
+            type="text"
+            placeholder="e.g. growing family, downsizing"
+            value={form.motivation}
+            onChange={(e) => handleChange('motivation', e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="mi-blocker">Blocker</label>
+          <input
+            id="mi-blocker"
+            type="text"
+            placeholder="e.g. needs to sell first, financing"
+            value={form.blocker}
+            onChange={(e) => handleChange('blocker', e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="mi-leadSource">Lead Source</label>
+          <input
+            id="mi-leadSource"
+            type="text"
+            placeholder="e.g. referral from Mike"
+            value={form.leadSource}
+            onChange={(e) => handleChange('leadSource', e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="mi-comments">Comments</label>
+          <textarea
+            id="mi-comments"
+            className="note-textarea"
+            rows={3}
+            placeholder="Short context for this client — for longer entries, use Notes."
+            value={form.comments}
+            onChange={(e) => handleChange('comments', e.target.value)}
+          />
+        </div>
+      </form>
+    );
+  },
+);
 
 // --- Note Editor ---
 
@@ -444,65 +462,76 @@ function NoteItem({ dealId, note }: { dealId: string; note: NoteType }) {
 
 // --- Main Tab ---
 
-export function ActivityTab({ deal }: ActivityTabProps) {
-  const logEntries = [...deal.contactLog].reverse();
+export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
+  function ActivityTab({ deal, onRequestSave }, ref) {
+    const logEntries = [...deal.contactLog].reverse();
+    const moreInfoRef = useRef<MoreInfoFormHandle>(null);
 
-  return (
-    <div className="drawer-tab-content">
-      <section className="tab-section">
-        <h3 className="tab-section-title">Log Activity</h3>
-        <p className="tab-section-help">
-          Records a touch with the client (call, text, email, meeting). Updates
-          their last-contact date and removes them from First Touch.
-        </p>
-        <LogActivityForm deal={deal} />
-        {logEntries.length === 0 ? (
-          <p className="empty-state empty-state--spaced">No activity logged yet.</p>
-        ) : (
-          <div className="log-entries">
-            {logEntries.map((entry) => (
-              <div key={entry.id} className="log-entry">
-                <div className="log-entry-header">
-                  <span className="log-entry-method">
-                    {CONTACT_METHOD_LABELS[entry.method]}
-                  </span>
-                  <span className="log-entry-author">{entry.author}</span>
-                  <span className="log-entry-date">{formatTimestamp(entry.timestamp)}</span>
+    useImperativeHandle(ref, () => ({
+      getMoreInfoPatch: () => moreInfoRef.current?.getPatch() ?? {},
+      markMoreInfoSaved: () => {
+        moreInfoRef.current?.markSaved();
+      },
+      isMoreInfoDirty: () => moreInfoRef.current?.isDirty() ?? false,
+    }));
+
+    return (
+      <>
+        <section id="section-more-info" className="record-section">
+          <h3 className="record-section-title">More Info</h3>
+          <p className="record-section-hint">
+            Structured context — timeframe, area, motivation, blockers, lead source,
+            and short comments. Saved with the rest of the client record via Save Changes.
+          </p>
+          <MoreInfoForm ref={moreInfoRef} deal={deal} onRequestSave={onRequestSave} />
+        </section>
+
+        <section id="section-activity" className="record-section">
+          <h3 className="record-section-title">Activity</h3>
+          <p className="record-section-hint">
+            Records a touch with the client (call, text, email, meeting). Updates
+            the last-contact date and removes them from First Touch.
+          </p>
+          <LogActivityForm deal={deal} />
+          {logEntries.length === 0 ? (
+            <p className="empty-state empty-state--spaced">No activity logged yet.</p>
+          ) : (
+            <div className="log-entries">
+              {logEntries.map((entry) => (
+                <div key={entry.id} className="log-entry">
+                  <div className="log-entry-header">
+                    <span className="log-entry-date">{formatTimestamp(entry.timestamp)}</span>
+                    <span className="log-entry-method">
+                      {CONTACT_METHOD_LABELS[entry.method]}
+                    </span>
+                    <span className="log-entry-author">{entry.author}</span>
+                  </div>
+                  <p className="log-entry-note">{entry.note}</p>
                 </div>
-                <p className="log-entry-note">{entry.note}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
 
-      <section className="tab-section">
-        <h3 className="tab-section-title">More Info</h3>
-        <p className="tab-section-help">
-          Structured context — timeframe, area, motivation, blockers, lead source.
-          Use Notes for freeform observations.
-        </p>
-        <MoreInfoForm deal={deal} />
-      </section>
-
-      <section className="tab-section">
-        <h3 className="tab-section-title">Notes</h3>
-        <p className="tab-section-help">
-          Freeform observations for your own reference. <strong>Does not</strong>{' '}
-          count as a contact — clients with notes but no logged activity stay in
-          First Touch.
-        </p>
-        <AddNoteForm dealId={deal.id} />
-        {deal.notes.length === 0 ? (
-          <p className="empty-state">No notes yet.</p>
-        ) : (
-          <div className="notes-list">
-            {deal.notes.map((note) => (
-              <NoteItem key={note.id} dealId={deal.id} note={note} />
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
+        <section id="section-notes" className="record-section">
+          <h3 className="record-section-title">Notes</h3>
+          <p className="record-section-hint">
+            Freeform observations for your own reference. <strong>Does not</strong>{' '}
+            count as a contact — clients with notes but no logged activity stay in
+            First Touch.
+          </p>
+          <AddNoteForm dealId={deal.id} />
+          {deal.notes.length === 0 ? (
+            <p className="empty-state">No notes yet.</p>
+          ) : (
+            <div className="notes-list">
+              {deal.notes.map((note) => (
+                <NoteItem key={note.id} dealId={deal.id} note={note} />
+              ))}
+            </div>
+          )}
+        </section>
+      </>
+    );
+  },
+);
