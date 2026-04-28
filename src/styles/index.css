@@ -1081,13 +1081,15 @@ body {
    Today View — Unified priority list
    ============================================ */
 
-/* Compact Badger Says strip — borrows the today-info-banner pattern but with
-   an emphasized title and the brand mark. */
+/* Compact Badger Says strip — branded guidance bar. Subtle muted-blue
+   left accent and tinted background keep it tied to the Badger mark
+   without dominating the page. */
 .badger-says {
   margin-bottom: var(--space-md);
   padding: 12px 16px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--accent-muted);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-md);
   display: flex;
   align-items: flex-start;

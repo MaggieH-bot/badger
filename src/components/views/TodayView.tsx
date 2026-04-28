@@ -50,28 +50,96 @@ function pluralClient(n: number): string {
   return n === 1 ? 'client' : 'clients';
 }
 
-// Compose a short Badger Says briefing: a cheeky lead phrase sized to the
-// total workload, then a comma-separated action priority. Pulls counts only;
-// no new logic.
-function badgerSaysMessage(c: {
+// --- Badger Says: canned-phrase rotation -------------------------------
+//
+// Profile selection is workload-shape based:
+//   all_clear  → total actionable = 0
+//   mixed      → more than one bucket has records
+//   overdue / due_today / needs_step → only that bucket has records
+//
+// The lead phrase rotates daily: same date + same profile → same phrase, new
+// date may show a different one. Phrases are picked from approved banks; the
+// action sentence (if any) is appended unchanged.
+
+type SaysProfile = 'all_clear' | 'mixed' | 'overdue' | 'due_today' | 'needs_step';
+
+const PHRASE_BANK: Record<SaysProfile, string[]> = {
+  all_clear: [
+    'All caught up. Suspicious, but we’ll take it.',
+    'Nothing needs action today. Enjoy the suspicious silence.',
+    'Clean board. Rare bird.',
+    'No fires today. Badger approves.',
+    'The list is quiet. Try not to jinx it.',
+  ],
+  mixed: [
+    'Tiny chaos, manageable pile.',
+    'The gremlins are organized.',
+    'Not a five-alarm fire, but there are loose ends.',
+    'A little cleanup now beats a client surprise later.',
+    'Manageable mayhem. Start at the top.',
+  ],
+  overdue: [
+    'Red flags first, victory lap later.',
+    'The overdue pile gets first dibs.',
+    'Start with the late stuff. It’s already waving a tiny red flag.',
+    'Badger does not spiral. Badger starts with overdue.',
+    'Honey badger mode: handle the thing in front of you.',
+  ],
+  due_today: [
+    'Today has assignments. Nothing dramatic, just don’t let them loiter.',
+    'Handle today before it becomes tomorrow’s problem.',
+    'Today’s work is waiting politely. For now.',
+    'The calendar has spoken. Start here.',
+    'Badger found today’s marching orders.',
+  ],
+  needs_step: [
+    'No drama, just decisions. Give these clients a next step.',
+    'The loose ends need leashes.',
+    'Most of the work is giving clients a plan. Future-you says thanks.',
+    'Badger is not here for drama. It is here for next steps.',
+    'Plans beat panic. Start handing out next steps.',
+  ],
+};
+
+function selectProfile(c: {
   overdue: number;
   due_today: number;
   needs_next_step: number;
-}): string {
+}): SaysProfile {
   const total = c.overdue + c.due_today + c.needs_next_step;
+  if (total === 0) return 'all_clear';
+  const populated =
+    (c.overdue > 0 ? 1 : 0) +
+    (c.due_today > 0 ? 1 : 0) +
+    (c.needs_next_step > 0 ? 1 : 0);
+  if (populated > 1) return 'mixed';
+  if (c.overdue > 0) return 'overdue';
+  if (c.due_today > 0) return 'due_today';
+  return 'needs_step';
+}
 
-  if (total === 0) {
-    return 'All caught up. Nothing on fire today.';
+// Stable daily hash on (profile + local-date) — same key on the same day
+// returns the same index, so reloads don't reshuffle the phrase. New
+// calendar day rolls the index forward (likely to a different phrase).
+function dailyPhraseIndex(profile: SaysProfile, now: Date, count: number): number {
+  const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  const seed = `${profile}|${dateKey}`;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) | 0;
   }
+  return Math.abs(h) % count;
+}
 
-  // Cheeky lead, sized by total. Tuned so the user's reference 28-client case
-  // ("Tiny chaos, manageable pile.") falls in the middle band.
-  let lead: string;
-  if (total === 1) lead = 'Just the one — easy.';
-  else if (total <= 5) lead = 'Small pile, knock it out.';
-  else if (total <= 30) lead = 'Tiny chaos, manageable pile.';
-  else if (total <= 60) lead = 'Real workload — pace yourself.';
-  else lead = 'Big day. Coffee up.';
+function badgerSaysMessage(
+  c: { overdue: number; due_today: number; needs_next_step: number },
+  now: Date = new Date(),
+): string {
+  const profile = selectProfile(c);
+  const bank = PHRASE_BANK[profile];
+  const lead = bank[dailyPhraseIndex(profile, now, bank.length)];
+
+  if (profile === 'all_clear') return lead;
 
   // Action priority: overdue → due today → needs step. Verbs are lowercase
   // by default; the first item gets capitalized after assembly.
@@ -88,8 +156,6 @@ function badgerSaysMessage(c: {
     );
   }
 
-  // Capitalize the first verb. Join with commas; insert "then " before the
-  // final item when there are 2+ to read naturally.
   parts[0] = parts[0][0].toUpperCase() + parts[0].slice(1);
   let action: string;
   if (parts.length === 1) {
