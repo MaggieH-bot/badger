@@ -8,7 +8,7 @@ import { computeUrgency } from '../../utils/urgency';
 import { computeInsight } from '../../utils/insights';
 import { displayAssignee } from '../../utils/assignee';
 import { InsightPanel } from '../intelligence/InsightPanel';
-import { DetailsTab } from './DetailsTab';
+import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
 
@@ -40,17 +40,29 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
   const { members } = useWorkspaceMembers();
   const [activeTab, setActiveTab] = useState<DrawerTab>('details');
   const drawerRef = useRef<HTMLDivElement>(null);
+  const detailsRef = useRef<DetailsTabHandle>(null);
 
   const deal: Deal | undefined = deals.find((d) => d.id === dealId);
 
-  // Auto-close if deal no longer exists
+  // requestClose checks for unsaved Details edits and prompts before closing.
+  // Used by the X, the Close button, click-outside, and the auto-close
+  // effects (where prompting doesn't apply — we just call onClose directly).
+  function requestClose() {
+    if (detailsRef.current?.isDirty()) {
+      const ok = window.confirm('Discard unsaved changes?');
+      if (!ok) return;
+    }
+    onClose();
+  }
+
+  // Auto-close if deal no longer exists (data-driven; no prompt).
   useEffect(() => {
     if (!deal) {
       onClose();
     }
   }, [deal, onClose]);
 
-  // Auto-close if team filter changes and deal no longer matches
+  // Auto-close if team filter changes and deal no longer matches.
   useEffect(() => {
     if (
       deal &&
@@ -61,13 +73,17 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
     }
   }, [deal, preferences.activeTeamFilter, onClose]);
 
-  // Click-outside to close
+  // Click-outside to close (uses requestClose so unsaved edits prompt first).
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
         drawerRef.current &&
         !drawerRef.current.contains(e.target as Node)
       ) {
+        if (detailsRef.current?.isDirty()) {
+          const ok = window.confirm('Discard unsaved changes?');
+          if (!ok) return;
+        }
         onClose();
       }
     }
@@ -100,7 +116,7 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
           </div>
           <button
             className="drawer-close"
-            onClick={onClose}
+            onClick={requestClose}
             type="button"
             aria-label="Close drawer"
           >
@@ -144,8 +160,8 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
           {activeTab === 'details' && (
             <DetailsTab
               key={deal.id}
+              ref={detailsRef}
               deal={deal}
-              onSaved={onClose}
               onDeleted={onClose}
               onOpenActivity={() => setActiveTab('activity')}
             />
@@ -158,10 +174,19 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
           <button
             type="button"
             className="btn btn--secondary"
-            onClick={onClose}
+            onClick={requestClose}
           >
             Close
           </button>
+          {activeTab === 'details' && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => detailsRef.current?.save()}
+            >
+              Save Changes
+            </button>
+          )}
         </div>
       </div>
     </div>

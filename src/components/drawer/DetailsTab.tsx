@@ -1,4 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import type { Deal, OpportunityType, Sequencing } from '../../types';
 import {
   STAGE_LABELS,
@@ -25,9 +30,16 @@ import {
 
 interface DetailsTabProps {
   deal: Deal;
-  onSaved: () => void;
   onDeleted: () => void;
   onOpenActivity: () => void;
+}
+
+// Imperative handle exposed to the drawer footer so the global Save Changes
+// button can drive this tab's save logic, and the Close prompt can ask
+// whether the form has unsaved edits.
+export interface DetailsTabHandle {
+  save: () => void;
+  isDirty: () => boolean;
 }
 
 function parseProbability(input: string): number | undefined {
@@ -76,12 +88,17 @@ function initForm(deal: Deal) {
   };
 }
 
-export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: DetailsTabProps) {
+export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
+  function DetailsTab({ deal, onDeleted, onOpenActivity }, ref) {
   const { dispatch } = useDeals();
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
+  const [savedFlash, setSavedFlash] = useState(false);
+  // Tracks whether the user has typed in any field since the last save. Used
+  // by the drawer footer to decide whether Close needs to confirm.
+  const userTouchedRef = useRef(false);
 
   const currentUserId = user?.id ?? null;
   const assigneeOptions = buildAssigneeOptions(members, currentUserId);
@@ -116,6 +133,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
     field: K,
     value: ReturnType<typeof initForm>[K],
   ) {
+    userTouchedRef.current = true;
     setForm((f) => ({ ...f, [field]: value }));
     if (errors.clientName && field === 'clientName') {
       setErrors((prev) => ({ ...prev, clientName: undefined }));
@@ -125,14 +143,9 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
     }
   }
 
-  function handleCancel() {
-    setForm(initForm(deal));
-    setErrors({});
-  }
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-
+  // performSave handles validation + dispatch. Drawer footer's Save Changes
+  // button calls this through the imperative handle below.
+  function performSave(): boolean {
     const trimmedName = form.clientName.trim();
     const newErrors: typeof errors = {};
 
@@ -149,7 +162,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      return;
+      return false;
     }
 
     const dueIso = form.nextStepDue.trim()
@@ -180,8 +193,23 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
       },
     });
 
-    onSaved();
+    userTouchedRef.current = false;
+    setSavedFlash(true);
+    window.setTimeout(() => setSavedFlash(false), 2000);
+    return true;
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: () => {
+        performSave();
+      },
+      isDirty: () => userTouchedRef.current,
+    }),
+    // performSave is recreated each render; that's fine — the latest closure
+    // is what the footer should call.
+  );
 
   function handleDelete() {
     const ok = window.confirm(
@@ -194,7 +222,16 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
 
   return (
     <div className="drawer-tab-content">
-      <form className="deal-form" onSubmit={handleSubmit}>
+      <form
+        className="deal-form"
+        onSubmit={(e) => {
+          // Saving happens via the drawer footer's Save Changes button.
+          // Suppress implicit form submission (e.g. Enter inside an input)
+          // so it doesn't reload the page or skip validation.
+          e.preventDefault();
+          performSave();
+        }}
+      >
         <h3 className="form-group-title">Identity & Pipeline</h3>
 
         <div className="form-field">
@@ -455,15 +492,11 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
           View Activity & More Info →
         </button>
 
-        <div className="form-actions">
-          <button type="button" className="btn btn--secondary" onClick={handleCancel}>
-            Cancel
-          </button>
-          <button type="submit" className="btn btn--primary">
-            Save
-          </button>
-        </div>
-
+        {savedFlash && (
+          <p className="form-saved-flash" role="status">
+            Saved.
+          </p>
+        )}
       </form>
 
       <section className="danger-zone">
@@ -486,4 +519,5 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
       </section>
     </div>
   );
-}
+  },
+);
