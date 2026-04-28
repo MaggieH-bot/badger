@@ -1,55 +1,72 @@
 import { useState } from 'react';
-import type { AppRoute, Category, DealWithUrgency } from '../../types';
-import { CATEGORIES, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
+import type { AppRoute, DealWithUrgency } from '../../types';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
 import {
   computeUrgency,
-  isUnattended,
-  sortByAttentionWithinCategory,
+  todayBucket,
+  type TodayBucket,
 } from '../../utils/urgency';
-import {
-  computeInsight,
-  sortByInsightPriority,
-  CALM_BRIEFING_MESSAGE,
-  type DealWithInsight,
-} from '../../utils/insights';
 import { DealCard } from '../deals/DealCard';
-import { InsightPanel } from '../intelligence/InsightPanel';
 
 interface TodayViewProps {
   onSelectDeal: (dealId: string) => void;
+  // navigate is unused now that the First Touch overflow link is gone, but
+  // App.tsx still passes it. Keeping the prop avoids touching unrelated code.
   navigate: (to: AppRoute) => void;
 }
 
-const BRIEFING_MAX = 5;
-const FIRST_TOUCH_PREVIEW = 5;
-// Never-contacted clients older than this start showing up in Badger Says
-// alongside cadence-driven follow-ups.
-const STALE_NEVER_CONTACTED_DAYS = 7;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-type TodayFilter = 'hot' | 'nurture' | 'watch' | 'needs_attention';
+// Filter handles: clicking a card toggles the corresponding filter on/off.
+// 'all_action' shows the union of the three buckets in a flat ordered list;
+// the bucket-specific filters scope to one bucket only.
+type TodayFilter = 'all_action' | TodayBucket;
 
 const FILTER_LABELS: Record<TodayFilter, string> = {
-  hot: 'Hot',
-  nurture: 'Nurture',
-  watch: 'Watch',
-  needs_attention: 'Needs Attention',
+  all_action: 'Needs Action',
+  overdue: 'Overdue',
+  due_today: 'Due Today',
+  needs_next_step: 'Needs Next Step',
 };
 
-export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
+const SECTION_TITLES: Record<TodayBucket, string> = {
+  overdue: 'Overdue',
+  due_today: 'Due Today',
+  needs_next_step: 'Needs Next Step',
+};
+
+const SECTION_HELP: Record<TodayBucket, string> = {
+  overdue: 'Next Step Due Date is in the past.',
+  due_today: 'Next Step Due Date falls today.',
+  needs_next_step: 'No Next Step or Due Date set yet.',
+};
+
+const SECTION_ORDER: TodayBucket[] = ['overdue', 'due_today', 'needs_next_step'];
+
+// Within a section, sort by next-step due (earliest first), then by client
+// name. needs_next_step has no due date, so we fall through to name.
+function sortBucket(deals: DealWithUrgency[]): DealWithUrgency[] {
+  return [...deals].sort((a, b) => {
+    const ad = a.nextStepDue ?? '';
+    const bd = b.nextStepDue ?? '';
+    if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+    if (ad && !bd) return -1;
+    if (!ad && bd) return 1;
+    return a.clientName.localeCompare(b.clientName);
+  });
+}
+
+export function TodayView({ onSelectDeal }: TodayViewProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
 
-  // Persistent summary-card filter. Toggling the same card off clears it.
+  // Persistent summary-card filter. Clicking the active card again clears it.
   const [activeFilter, setActiveFilter] = useState<TodayFilter | null>(null);
 
-  // Stage filter first (active deals only) — used for filter-hidden count.
+  // Active deals only; closed records are excluded from Today entirely.
   const activeDeals = deals.filter((d) => d.stage !== 'closed');
 
-  // Then apply team filter.
+  // Then apply team filter for the count surfaced in the banner.
   const filtered = activeDeals.filter(
     (d) =>
       preferences.activeTeamFilter === 'All' ||
@@ -60,95 +77,61 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
 
   const withUrgency = filtered.map((d) => computeUrgency(d));
 
-  // Compute insights once for the whole filtered set.
-  const withInsight: DealWithInsight[] = withUrgency.map((d) => ({
-    ...d,
-    insight: computeInsight(d),
-  }));
-
-  // Today-worthy: cadence-driven attention + Under Contract always surfaces.
-  const todayWorthy = withInsight.filter(
-    (d) =>
-      (d.followUpStatus === 'needs_attention' && !d.neverContacted) ||
-      d.stage === 'under_contract',
-  );
-
-  // First Touch list — sorted oldest-on-file first.
-  const neverContacted = withInsight
-    .filter((d) => d.neverContacted)
-    .slice()
-    .sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
-
-  const firstTouchPreview = neverContacted.slice(0, FIRST_TOUCH_PREVIEW);
-
-  // Stale never-contacted (on file for a week+) graduate into the briefing pool.
-  const [nowMs] = useState(() => Date.now());
-  const staleNeverContacted = neverContacted.filter(
-    (d) =>
-      (nowMs - new Date(d.createdAt).getTime()) / MS_PER_DAY >=
-      STALE_NEVER_CONTACTED_DAYS,
-  );
-
-  const briefingPool: DealWithInsight[] = [...todayWorthy, ...staleNeverContacted];
-  const briefing = sortByInsightPriority(briefingPool).slice(0, BRIEFING_MAX);
-
-  // Group today-worthy by category, sort within (used in the unfiltered layout).
-  const grouped: Record<Category, DealWithUrgency[]> = {
-    hot: [],
-    nurture: [],
-    watch: [],
+  // Bucketize once. Mutually exclusive precedence: Overdue → Due Today →
+  // Needs Next Step. Any deal not matching one of these three is not part of
+  // the action queue and is omitted from Today.
+  const buckets: Record<TodayBucket, DealWithUrgency[]> = {
+    overdue: [],
+    due_today: [],
+    needs_next_step: [],
   };
-  for (const d of todayWorthy) {
-    grouped[d.category].push(d);
+  for (const d of withUrgency) {
+    const key = todayBucket(d);
+    if (key) buckets[key].push(d);
   }
-  for (const cat of CATEGORIES) {
-    grouped[cat] = sortByAttentionWithinCategory(grouped[cat]);
+  for (const key of SECTION_ORDER) {
+    buckets[key] = sortBucket(buckets[key]);
   }
 
-  // Summary counts. Each card's count must equal the number of records shown
-  // when that filter is active.
+  // Card counts. Needs Action is the union of the three buckets — since the
+  // buckets are mutually exclusive, this is a plain sum.
   const counts = {
-    hot: withUrgency.filter((d) => d.category === 'hot').length,
-    nurture: withUrgency.filter((d) => d.category === 'nurture').length,
-    watch: withUrgency.filter((d) => d.category === 'watch').length,
-    needsAttention: withUrgency.filter((d) => isUnattended(d)).length,
+    overdue: buckets.overdue.length,
+    due_today: buckets.due_today.length,
+    needs_next_step: buckets.needs_next_step.length,
+    all_action:
+      buckets.overdue.length +
+      buckets.due_today.length +
+      buckets.needs_next_step.length,
   };
 
-  const hasAny = withUrgency.length > 0;
-  const hasTodayWorthy = todayWorthy.length > 0;
-  const populatedCategories = CATEGORIES.filter((cat) => grouped[cat].length > 0);
-
-  // Card-clickability: enabled iff non-zero count.
+  // Card clickability: enabled iff non-zero count.
   const canClick = {
-    hot: counts.hot > 0,
-    nurture: counts.nurture > 0,
-    watch: counts.watch > 0,
-    needsAttention: counts.needsAttention > 0,
+    overdue: counts.overdue > 0,
+    due_today: counts.due_today > 0,
+    needs_next_step: counts.needs_next_step > 0,
+    all_action: counts.all_action > 0,
   };
 
-  // Click handler: toggle the card on/off (clicking the active card clears).
   function handleCardClick(filter: TodayFilter) {
     setActiveFilter((prev) => (prev === filter ? null : filter));
   }
 
-  // The records shown when a filter is active. Sort by needs_attention first,
-  // then days-since-contact desc, so the most urgent rise to the top.
+  // Flat list rendered when activeFilter is set. For 'all_action', concatenate
+  // the three buckets in precedence order so the most urgent surface first.
   function buildFilteredList(): DealWithUrgency[] {
-    if (activeFilter === 'needs_attention') {
-      return sortByAttentionWithinCategory(
-        withUrgency.filter((d) => isUnattended(d)),
-      );
+    if (activeFilter === 'all_action') {
+      return [...buckets.overdue, ...buckets.due_today, ...buckets.needs_next_step];
     }
-    if (activeFilter === 'hot' || activeFilter === 'nurture' || activeFilter === 'watch') {
-      return sortByAttentionWithinCategory(
-        withUrgency.filter((d) => d.category === activeFilter),
-      );
+    if (activeFilter) {
+      return buckets[activeFilter];
     }
     return [];
   }
+
   const filteredList = activeFilter ? buildFilteredList() : [];
+  const hasAny = withUrgency.length > 0;
+  const populatedSections = SECTION_ORDER.filter((k) => buckets[k].length > 0);
 
   return (
     <div className="view">
@@ -159,51 +142,51 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
       <div className="today-summary">
         <button
           type="button"
-          className={`today-summary-card today-summary-card--hot${
-            activeFilter === 'hot' ? ' today-summary-card--active' : ''
+          className={`today-summary-card today-summary-card--attention${
+            activeFilter === 'all_action' ? ' today-summary-card--active' : ''
           }`}
-          aria-pressed={activeFilter === 'hot'}
-          disabled={!canClick.hot}
-          onClick={() => handleCardClick('hot')}
+          aria-pressed={activeFilter === 'all_action'}
+          disabled={!canClick.all_action}
+          onClick={() => handleCardClick('all_action')}
         >
-          <span className="today-summary-count">{counts.hot}</span>
-          <span className="today-summary-label">Hot</span>
+          <span className="today-summary-count">{counts.all_action}</span>
+          <span className="today-summary-label">Needs Action</span>
+        </button>
+        <button
+          type="button"
+          className={`today-summary-card today-summary-card--hot${
+            activeFilter === 'overdue' ? ' today-summary-card--active' : ''
+          }`}
+          aria-pressed={activeFilter === 'overdue'}
+          disabled={!canClick.overdue}
+          onClick={() => handleCardClick('overdue')}
+        >
+          <span className="today-summary-count">{counts.overdue}</span>
+          <span className="today-summary-label">Overdue</span>
         </button>
         <button
           type="button"
           className={`today-summary-card today-summary-card--nurture${
-            activeFilter === 'nurture' ? ' today-summary-card--active' : ''
+            activeFilter === 'due_today' ? ' today-summary-card--active' : ''
           }`}
-          aria-pressed={activeFilter === 'nurture'}
-          disabled={!canClick.nurture}
-          onClick={() => handleCardClick('nurture')}
+          aria-pressed={activeFilter === 'due_today'}
+          disabled={!canClick.due_today}
+          onClick={() => handleCardClick('due_today')}
         >
-          <span className="today-summary-count">{counts.nurture}</span>
-          <span className="today-summary-label">Nurture</span>
+          <span className="today-summary-count">{counts.due_today}</span>
+          <span className="today-summary-label">Due Today</span>
         </button>
         <button
           type="button"
           className={`today-summary-card today-summary-card--watch${
-            activeFilter === 'watch' ? ' today-summary-card--active' : ''
+            activeFilter === 'needs_next_step' ? ' today-summary-card--active' : ''
           }`}
-          aria-pressed={activeFilter === 'watch'}
-          disabled={!canClick.watch}
-          onClick={() => handleCardClick('watch')}
+          aria-pressed={activeFilter === 'needs_next_step'}
+          disabled={!canClick.needs_next_step}
+          onClick={() => handleCardClick('needs_next_step')}
         >
-          <span className="today-summary-count">{counts.watch}</span>
-          <span className="today-summary-label">Watch</span>
-        </button>
-        <button
-          type="button"
-          className={`today-summary-card today-summary-card--attention${
-            activeFilter === 'needs_attention' ? ' today-summary-card--active' : ''
-          }`}
-          aria-pressed={activeFilter === 'needs_attention'}
-          disabled={!canClick.needsAttention}
-          onClick={() => handleCardClick('needs_attention')}
-        >
-          <span className="today-summary-count">{counts.needsAttention}</span>
-          <span className="today-summary-label">Needs Attention</span>
+          <span className="today-summary-count">{counts.needs_next_step}</span>
+          <span className="today-summary-label">Needs Next Step</span>
         </button>
       </div>
 
@@ -235,100 +218,33 @@ export function TodayView({ onSelectDeal, navigate }: TodayViewProps) {
             </div>
           )}
         </>
+      ) : !hasAny ? (
+        <div className="empty-state">
+          <p>No active clients.</p>
+          <p>Click "+ Add Client" to create your first client.</p>
+        </div>
+      ) : counts.all_action === 0 ? (
+        <div className="empty-state">
+          <p>Nothing needs action today.</p>
+          <p>Every active client has a Next Step and Due Date in the future.</p>
+        </div>
       ) : (
-        <>
-          {hasAny && (
-            <section className="priority-briefing">
-              <h3 className="priority-briefing-title">Badger Says</h3>
-              {briefing.length === 0 ? (
-                <p className="priority-briefing-calm">{CALM_BRIEFING_MESSAGE}</p>
-              ) : (
-                <div className="priority-briefing-list">
-                  {briefing.map((d) => (
-                    <InsightPanel
-                      key={d.id}
-                      insight={d.insight}
-                      dealName={d.clientName}
-                      onClick={() => onSelectDeal(d.id)}
-                      variant="full"
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {neverContacted.length > 0 && (
-            <section
-              id="first-touch-section"
-              className="first-touch-section"
-              aria-label="First Touch"
-            >
-              <div className="first-touch-header">
-                <h3 className="first-touch-title">
-                  First Touch{' '}
-                  <span className="first-touch-count">({neverContacted.length})</span>
-                </h3>
-                <p className="first-touch-caption">
-                  Clients on file but never contacted. Use <strong>Log Activity</strong>{' '}
-                  in the drawer to record a touch — that removes them from this list.
-                </p>
+        <div className="today-sections">
+          {populatedSections.map((key) => (
+            <section key={key} className="today-section">
+              <div className={`today-section-header today-section-header--${key}`}>
+                <h3>{SECTION_TITLES[key]}</h3>
+                <span className="today-section-count">{buckets[key].length}</span>
               </div>
-              <div className="first-touch-list">
-                {firstTouchPreview.map((deal) => (
-                  <button
-                    key={deal.id}
-                    type="button"
-                    className={`first-touch-row first-touch-row--${deal.category}`}
-                    onClick={() => onSelectDeal(deal.id)}
-                  >
-                    <span className="first-touch-name">{deal.clientName}</span>
-                    <span className={`category-badge category-badge--${deal.category}`}>
-                      {CATEGORY_LABELS[deal.category]}
-                    </span>
-                    {deal.opportunityType && (
-                      <span className="first-touch-type">
-                        {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
-                      </span>
-                    )}
-                  </button>
+              <p className="today-section-help">{SECTION_HELP[key]}</p>
+              <div className="today-section-cards">
+                {buckets[key].map((deal) => (
+                  <DealCard key={deal.id} deal={deal} onClick={onSelectDeal} />
                 ))}
               </div>
-              {neverContacted.length > firstTouchPreview.length && (
-                <button
-                  type="button"
-                  className="first-touch-overflow"
-                  onClick={() => navigate('#/pipeline')}
-                >
-                  View all {neverContacted.length} →
-                </button>
-              )}
             </section>
-          )}
-
-          {!hasAny ? (
-            <div className="empty-state">
-              <p>No active clients.</p>
-              <p>Click "+ Add Client" to create your first client.</p>
-            </div>
-          ) : hasTodayWorthy ? (
-            <div className="today-sections">
-              {populatedCategories.map((cat) => (
-                <section key={cat} className="today-section">
-                  <div className={`today-section-header today-section-header--${cat}`}>
-                    <h3>{CATEGORY_LABELS[cat]}</h3>
-                    <span className="today-section-count">{grouped[cat].length}</span>
-                  </div>
-                  <div className="today-section-cards">
-                    {grouped[cat].map((deal) => (
-                      <DealCard key={deal.id} deal={deal} onClick={onSelectDeal} />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : null}
-        </>
+          ))}
+        </div>
       )}
     </div>
   );

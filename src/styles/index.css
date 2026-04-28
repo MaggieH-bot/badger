@@ -703,6 +703,30 @@ body {
   color: var(--category-watch);
 }
 
+/* Action-bucket section headers — borrow tone from the cadence palette so
+   Overdue reads as urgent (hot), Due Today as warm (nurture), and Needs Next
+   Step as background (watch). */
+.today-section-header--overdue {
+  background: var(--category-hot-bg);
+  color: var(--category-hot);
+}
+
+.today-section-header--due_today {
+  background: var(--category-nurture-bg);
+  color: var(--category-nurture);
+}
+
+.today-section-header--needs_next_step {
+  background: var(--category-watch-bg);
+  color: var(--category-watch);
+}
+
+.today-section-help {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 12px;
+}
+
 .today-section-empty {
   color: var(--text-muted);
   font-size: 13px;

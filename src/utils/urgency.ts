@@ -137,3 +137,56 @@ export function sortByAttentionWithinCategory(deals: DealWithUrgency[]): DealWit
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 }
+
+// --- Today action-dashboard predicates ---
+//
+// Today is driven entirely by Next Step + Due Date. These four predicates
+// produce mutually exclusive buckets when applied with precedence Overdue >
+// Due Today > Needs Next Step (see bucketize() callers in TodayView).
+// All four ignore closed deals — closed records never appear in Today.
+
+// YYYY-MM-DD for the user's local calendar day. Stored due dates are also
+// YYYY-MM-DD-shaped (form input → new Date(YYYY-MM-DD).toISOString() preserves
+// the date prefix), so simple string comparison gives a calendar-day match
+// without timezone math.
+function localTodayString(now: Date): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function dueDateString(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function hasNextStepWithDue(d: Deal): boolean {
+  return !!d.nextStep?.trim() && !!d.nextStepDue;
+}
+
+export function isOverdueAction(d: Deal, now: Date = new Date()): boolean {
+  if (d.stage === 'closed') return false;
+  if (!hasNextStepWithDue(d)) return false;
+  return dueDateString(d.nextStepDue!) < localTodayString(now);
+}
+
+export function isDueTodayAction(d: Deal, now: Date = new Date()): boolean {
+  if (d.stage === 'closed') return false;
+  if (!hasNextStepWithDue(d)) return false;
+  return dueDateString(d.nextStepDue!) === localTodayString(now);
+}
+
+export function needsNextStep(d: Deal): boolean {
+  if (d.stage === 'closed') return false;
+  return !d.nextStep?.trim() || !d.nextStepDue;
+}
+
+export type TodayBucket = 'overdue' | 'due_today' | 'needs_next_step';
+
+export function todayBucket(d: Deal, now: Date = new Date()): TodayBucket | null {
+  if (d.stage === 'closed') return null;
+  if (isOverdueAction(d, now)) return 'overdue';
+  if (isDueTodayAction(d, now)) return 'due_today';
+  if (needsNextStep(d)) return 'needs_next_step';
+  return null;
+}

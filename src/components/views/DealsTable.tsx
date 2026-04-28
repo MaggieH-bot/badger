@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import type { DealWithUrgency, Category } from '../../types';
 import { STAGE_LABELS, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
@@ -26,42 +26,48 @@ type SortKey =
   | 'opportunityType'
   | 'stage'
   | 'assignedTo'
-  | 'followUp'
   | 'daysSinceContact'
   | 'price'
-  | 'nextStep';
+  | 'nextStep'
+  | 'dueDate';
 
 type SortDir = 'asc' | 'desc';
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+interface Column {
+  key: SortKey;
+  label: string;
+}
+
+// Pipeline view: action-driven set per the Today/Pipeline cleanup spec.
+// Drops Follow-Up, Address, Price; splits Next Step into Next Step + Due Date.
+const PIPELINE_COLUMNS: Column[] = [
   { key: 'clientName', label: 'Client' },
-  { key: 'category', label: 'Category' },
   { key: 'opportunityType', label: 'Type' },
   { key: 'stage', label: 'Stage' },
+  { key: 'category', label: 'Category' },
+  { key: 'nextStep', label: 'Next Step' },
+  { key: 'dueDate', label: 'Due Date' },
+  { key: 'daysSinceContact', label: 'Last Contact' },
+  { key: 'assignedTo', label: 'Assigned To' },
+];
+
+// Closed view: unchanged from prior behavior. Stage/Follow-Up are dropped here
+// because every record is closed and cadence no longer applies.
+const CLOSED_COLUMNS: Column[] = [
+  { key: 'clientName', label: 'Client' },
+  { key: 'category', label: 'Status' },
+  { key: 'opportunityType', label: 'Type' },
   { key: 'assignedTo', label: 'Assigned' },
-  { key: 'followUp', label: 'Follow-up' },
   { key: 'daysSinceContact', label: 'Last Contact' },
   { key: 'address', label: 'Address' },
   { key: 'price', label: 'Price' },
   { key: 'nextStep', label: 'Next Step' },
 ];
 
-const FOLLOWUP_SORT_ORDER: Record<string, number> = {
-  needs_attention: 0,
-  on_track: 1,
-  none: 2,
-};
-
 const CATEGORY_SORT_ORDER: Record<Category, number> = {
   hot: 0,
   nurture: 1,
   watch: 2,
-};
-
-const FOLLOWUP_DISPLAY: Record<string, string> = {
-  needs_attention: 'Needs Attention',
-  on_track: 'On Track',
-  none: '—',
 };
 
 function formatPrice(price: number): string {
@@ -115,6 +121,14 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatDueDateShort(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: SortDir): number {
   let cmp = 0;
 
@@ -137,9 +151,6 @@ function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: 
     case 'assignedTo':
       cmp = a.assignedTo.localeCompare(b.assignedTo);
       break;
-    case 'followUp':
-      cmp = FOLLOWUP_SORT_ORDER[a.followUpStatus] - FOLLOWUP_SORT_ORDER[b.followUpStatus];
-      break;
     case 'daysSinceContact':
       cmp = a.daysSinceContact - b.daysSinceContact;
       break;
@@ -149,6 +160,15 @@ function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: 
     case 'nextStep':
       cmp = (a.nextStep ?? '').localeCompare(b.nextStep ?? '');
       break;
+    case 'dueDate': {
+      // Empty due dates sort last in either direction.
+      const ad = a.nextStepDue ?? '';
+      const bd = b.nextStepDue ?? '';
+      if (ad && !bd) cmp = -1;
+      else if (!ad && bd) cmp = 1;
+      else cmp = ad.localeCompare(bd);
+      break;
+    }
   }
 
   return dir === 'asc' ? cmp : -cmp;
@@ -158,8 +178,17 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
   const { members } = useWorkspaceMembers();
-  const [sortKey, setSortKey] = useState<SortKey>('daysSinceContact');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const isClosed = mode === 'closed';
+  const columns = isClosed ? CLOSED_COLUMNS : PIPELINE_COLUMNS;
+
+  // Default sort: pipeline goes by Due Date asc (most urgent first); closed
+  // keeps the prior Last-Contact-desc behavior.
+  const [sortKey, setSortKey] = useState<SortKey>(
+    isClosed ? 'daysSinceContact' : 'dueDate',
+  );
+  const [sortDir, setSortDir] = useState<SortDir>(
+    isClosed ? 'desc' : 'asc',
+  );
 
   // Stage filter by mode (active vs closed) — used to compute filter-hidden count
   const stageMatched = deals.filter((d) => {
@@ -192,17 +221,6 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     [JSON.stringify(withUrgency), sortKey, sortDir],
   );
 
-  // Closed Transactions hides Stage (everything is "Closed") and Follow-Up
-  // (no cadence after a deal closes). Pipeline view keeps both.
-  const isClosed = mode === 'closed';
-  const visibleColumns = COLUMNS.filter((col) => {
-    if (isClosed && (col.key === 'stage' || col.key === 'followUp')) return false;
-    return true;
-  }).map((col) => {
-    if (isClosed && col.key === 'category') return { ...col, label: 'Status' };
-    return col;
-  });
-
   function handleSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -216,6 +234,65 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     if (key !== sortKey) return '';
     return sortDir === 'asc' ? ' ▲' : ' ▼';
   }
+
+  // Single dispatcher for cell content, keyed by column. Both modes share most
+  // cells; only category renders differently in closed mode (Closed badge).
+  function renderCell(deal: DealWithUrgency, key: SortKey): ReactNode {
+    switch (key) {
+      case 'clientName':
+        return deal.clientName;
+      case 'category':
+        return deal.stage === 'closed' ? (
+          <span className="status-badge status-badge--closed">Closed</span>
+        ) : (
+          <span className={`category-badge category-badge--${deal.category}`}>
+            {CATEGORY_LABELS[deal.category]}
+          </span>
+        );
+      case 'opportunityType':
+        return deal.opportunityType ? (
+          <span className={`opp-type-pill opp-type-pill--${deal.opportunityType}`}>
+            {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
+          </span>
+        ) : (
+          <span className="followup-muted">—</span>
+        );
+      case 'stage':
+        return STAGE_LABELS[deal.stage];
+      case 'assignedTo':
+        return displayAssignee(deal.assignedTo, members);
+      case 'daysSinceContact':
+        return deal.neverContacted ? (
+          <span className="deals-table-never">Never contacted</span>
+        ) : (
+          <>
+            {formatDate(deal.lastContact!)}
+            <span className="deals-table-days">
+              {deal.daysSinceContact === 0
+                ? 'today'
+                : deal.daysSinceContact === 1
+                  ? '1d ago'
+                  : `${deal.daysSinceContact}d ago`}
+            </span>
+          </>
+        );
+      case 'address':
+        return deal.address ?? '';
+      case 'price':
+        return formatPriceCell(deal);
+      case 'nextStep':
+        return deal.nextStep ?? '';
+      case 'dueDate':
+        return deal.nextStepDue ? formatDueDateShort(deal.nextStepDue) : '';
+    }
+  }
+
+  const cellClassFor = (key: SortKey): string => {
+    const base = 'deals-table-td';
+    if (key === 'clientName') return `${base} deals-table-td--name`;
+    if (key === 'price') return `${base} deals-table-td--price`;
+    return base;
+  };
 
   if (sorted.length === 0) {
     return (
@@ -254,99 +331,36 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
       </div>
 
       <div className="table-wrap deals-table-desktop">
-      <table className="deals-table">
-        <thead>
-          <tr>
-            {visibleColumns.map((col) => (
-              <th
-                key={col.key}
-                className="deals-table-th"
-                onClick={() => handleSort(col.key)}
-              >
-                {col.label}{sortIndicator(col.key)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((deal) => (
-            <tr
-              key={deal.id}
-              className="deals-table-row"
-              onClick={() => onSelectDeal(deal.id)}
-            >
-              <td className="deals-table-td deals-table-td--name">{deal.clientName}</td>
-              <td className="deals-table-td">
-                {deal.stage === 'closed' ? (
-                  <span className="status-badge status-badge--closed">Closed</span>
-                ) : (
-                  <span className={`category-badge category-badge--${deal.category}`}>
-                    {CATEGORY_LABELS[deal.category]}
-                  </span>
-                )}
-              </td>
-              <td className="deals-table-td">
-                {deal.opportunityType ? (
-                  <span
-                    className={`opp-type-pill opp-type-pill--${deal.opportunityType}`}
-                  >
-                    {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
-                  </span>
-                ) : (
-                  <span className="followup-muted">—</span>
-                )}
-              </td>
-              {!isClosed && (
-                <td className="deals-table-td">{STAGE_LABELS[deal.stage]}</td>
-              )}
-              <td className="deals-table-td">
-                {displayAssignee(deal.assignedTo, members)}
-              </td>
-              {!isClosed && (
-                <td className="deals-table-td">
-                  {deal.followUpStatus === 'needs_attention' ? (
-                    <span className="attention-pill">Needs Attention</span>
-                  ) : (
-                    <span className="followup-muted">{FOLLOWUP_DISPLAY[deal.followUpStatus]}</span>
-                  )}
-                </td>
-              )}
-              <td className="deals-table-td">
-                {deal.neverContacted ? (
-                  <span className="deals-table-never">Never contacted</span>
-                ) : (
-                  <>
-                    {formatDate(deal.lastContact!)}
-                    <span className="deals-table-days">
-                      {deal.daysSinceContact === 0
-                        ? 'today'
-                        : deal.daysSinceContact === 1
-                          ? '1d ago'
-                          : `${deal.daysSinceContact}d ago`}
-                    </span>
-                  </>
-                )}
-              </td>
-              <td className="deals-table-td">{deal.address ?? ''}</td>
-              <td className="deals-table-td deals-table-td--price">
-                {formatPriceCell(deal)}
-              </td>
-              <td className="deals-table-td">
-                {deal.nextStep ? (
-                  <>
-                    {deal.nextStep}
-                    {deal.nextStepDue && (
-                      <span className="deals-table-due">
-                        {' '}— due {new Date(deal.nextStepDue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    )}
-                  </>
-                ) : ''}
-              </td>
+        <table className="deals-table">
+          <thead>
+            <tr>
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  className="deals-table-th"
+                  onClick={() => handleSort(col.key)}
+                >
+                  {col.label}{sortIndicator(col.key)}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((deal) => (
+              <tr
+                key={deal.id}
+                className="deals-table-row"
+                onClick={() => onSelectDeal(deal.id)}
+              >
+                {columns.map((col) => (
+                  <td key={col.key} className={cellClassFor(col.key)}>
+                    {renderCell(deal, col.key)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </>
   );
