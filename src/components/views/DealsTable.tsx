@@ -192,6 +192,17 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     [JSON.stringify(withUrgency), sortKey, sortDir],
   );
 
+  // Closed Transactions hides Stage (everything is "Closed") and Follow-Up
+  // (no cadence after a deal closes). Pipeline view keeps both.
+  const isClosed = mode === 'closed';
+  const visibleColumns = COLUMNS.filter((col) => {
+    if (isClosed && (col.key === 'stage' || col.key === 'followUp')) return false;
+    return true;
+  }).map((col) => {
+    if (isClosed && col.key === 'category') return { ...col, label: 'Status' };
+    return col;
+  });
+
   function handleSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -246,7 +257,7 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
       <table className="deals-table">
         <thead>
           <tr>
-            {COLUMNS.map((col) => (
+            {visibleColumns.map((col) => (
               <th
                 key={col.key}
                 className="deals-table-th"
@@ -285,17 +296,21 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
                   <span className="followup-muted">—</span>
                 )}
               </td>
-              <td className="deals-table-td">{STAGE_LABELS[deal.stage]}</td>
+              {!isClosed && (
+                <td className="deals-table-td">{STAGE_LABELS[deal.stage]}</td>
+              )}
               <td className="deals-table-td">
                 {displayAssignee(deal.assignedTo, members)}
               </td>
-              <td className="deals-table-td">
-                {deal.followUpStatus === 'needs_attention' ? (
-                  <span className="attention-pill">Needs Attention</span>
-                ) : (
-                  <span className="followup-muted">{FOLLOWUP_DISPLAY[deal.followUpStatus]}</span>
-                )}
-              </td>
+              {!isClosed && (
+                <td className="deals-table-td">
+                  {deal.followUpStatus === 'needs_attention' ? (
+                    <span className="attention-pill">Needs Attention</span>
+                  ) : (
+                    <span className="followup-muted">{FOLLOWUP_DISPLAY[deal.followUpStatus]}</span>
+                  )}
+                </td>
+              )}
               <td className="deals-table-td">
                 {deal.neverContacted ? (
                   <span className="deals-table-never">Never contacted</span>
