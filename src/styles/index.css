@@ -1081,6 +1081,36 @@ body {
    Today View — Unified priority list
    ============================================ */
 
+/* Next Step block in the client record — wraps the editable Next Step + Due
+   row and the Mark Complete affordance. Anchored for scroll-on-open. */
+.next-step-block {
+  scroll-margin-top: 12px;
+}
+
+.next-step-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.next-step-actions .btn-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.next-step-actions .btn-link:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.next-step-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Compact Badger Says strip — branded guidance bar. Subtle muted-blue
    left accent and tinted background keep it tied to the Badger mark
    without dominating the page. */

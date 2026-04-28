@@ -17,7 +17,9 @@ import {
 import { displayAssignee } from '../../utils/assignee';
 
 interface TodayViewProps {
-  onSelectDeal: (dealId: string) => void;
+  // Today rows pass 'next-step' so the drawer scrolls/focuses to the Next
+  // Step row — that's where Mark Complete and the editable Due Date live.
+  onSelectDeal: (dealId: string, focus?: 'next-step') => void;
   // navigate is unused here but App.tsx still passes it.
   navigate: (to: AppRoute) => void;
 }
@@ -361,7 +363,7 @@ export function TodayView({ onSelectDeal }: TodayViewProps) {
                   <tr
                     key={row.id}
                     className="today-list-row"
-                    onClick={() => onSelectDeal(row.id)}
+                    onClick={() => onSelectDeal(row.id, 'next-step')}
                   >
                     <td className="today-list-td--name">{row.clientName}</td>
                     <td>

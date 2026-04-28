@@ -33,6 +33,10 @@ const SECTIONS: { key: SectionKey; label: string }[] = [
 interface DealDrawerProps {
   dealId: string;
   onClose: () => void;
+  // 'next-step' scrolls the Next Step row into view on mount and focuses it.
+  // Used when a Today row opens the workspace, so the user lands on the
+  // editable Next Step / Due Date pair and the Mark Complete affordance.
+  initialFocus?: 'next-step';
 }
 
 function formatLastUpdated(iso: string): string {
@@ -46,7 +50,7 @@ function formatLastUpdated(iso: string): string {
   });
 }
 
-export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
+export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   const { deals, dispatch } = useDeals();
   const { preferences } = useUIPreferences();
   const { members } = useWorkspaceMembers();
@@ -150,6 +154,22 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
       onClose();
     }
   }, [deal, preferences.activeTeamFilter, onClose]);
+
+  // Scroll/focus the Next Step row when the drawer is opened from a Today
+  // row. The 60ms delay lets the modal mount and DetailsTab render the
+  // anchor before scrollIntoView runs.
+  useEffect(() => {
+    if (initialFocus !== 'next-step') return;
+    const t = window.setTimeout(() => {
+      const anchor = document.getElementById('anchor-next-step');
+      if (anchor) anchor.scrollIntoView({ behavior: 'auto', block: 'center' });
+      const input = document.getElementById(
+        'dt-nextStep',
+      ) as HTMLInputElement | null;
+      if (input) input.focus();
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [initialFocus]);
 
   // Click-outside (the dim overlay) closes the workspace, with the same
   // discard prompt as the X.

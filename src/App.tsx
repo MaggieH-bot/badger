@@ -17,19 +17,30 @@ import { DealForm } from './components/deals/DealForm';
 import { DealDrawer } from './components/drawer/DealDrawer';
 import { LoginScreen } from './components/auth/LoginScreen';
 
+type DealFocus = 'next-step';
+
 function AppContent() {
   const { route, navigate } = useRouter();
   const [showAddDeal, setShowAddDeal] = useState(false);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  // Focus hint for the next drawer open. Today rows pass 'next-step' so the
+  // workspace lands the user on the editable Next Step row; other views pass
+  // nothing so the drawer opens at the top as before.
+  const [selectedFocus, setSelectedFocus] = useState<DealFocus | null>(null);
   const { loading, fetchError, writeError, retryFetch, dismissWriteError } =
     useDeals();
 
-  const handleSelectDeal = useCallback((dealId: string) => {
-    setSelectedDealId(dealId);
-  }, []);
+  const handleSelectDeal = useCallback(
+    (dealId: string, focus?: DealFocus) => {
+      setSelectedDealId(dealId);
+      setSelectedFocus(focus ?? null);
+    },
+    [],
+  );
 
   const handleCloseDrawer = useCallback(() => {
     setSelectedDealId(null);
+    setSelectedFocus(null);
   }, []);
 
   if (loading) {
@@ -85,7 +96,11 @@ function AppContent() {
         </>
       )}
       {selectedDealId && (
-        <DealDrawer dealId={selectedDealId} onClose={handleCloseDrawer} />
+        <DealDrawer
+          dealId={selectedDealId}
+          onClose={handleCloseDrawer}
+          initialFocus={selectedFocus ?? undefined}
+        />
       )}
     </Shell>
   );

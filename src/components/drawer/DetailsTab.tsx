@@ -141,6 +141,18 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     }
   }
 
+  // Mark the current Next Step complete by clearing both the next-step text
+  // and the due date in form state. The user can then either type a new
+  // Next Step + Due Date and Save Changes (record disappears from Today, or
+  // moves to a different bucket), or just Save Changes (record moves to
+  // the Needs Step bucket on Today).
+  function handleMarkComplete() {
+    userTouchedRef.current = true;
+    setForm((f) => ({ ...f, nextStep: '', nextStepDue: '' }));
+  }
+
+  const hasNextStep = form.nextStep.trim() !== '' || form.nextStepDue !== '';
+
   // validate() runs the form-level checks, sets error state, and returns
   // whether the form is OK to save. The drawer calls this before getPatch().
   function validate(): boolean {
@@ -295,25 +307,46 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-field">
-            <label htmlFor="dt-nextStep">Next Step</label>
-            <input
-              id="dt-nextStep"
-              type="text"
-              placeholder="e.g. Send comps, schedule walkthrough"
-              value={form.nextStep}
-              onChange={(e) => handleChange('nextStep', e.target.value)}
-            />
+        <div id="anchor-next-step" className="next-step-block">
+          <div className="form-row">
+            <div className="form-field">
+              <label htmlFor="dt-nextStep">Next Step</label>
+              <input
+                id="dt-nextStep"
+                type="text"
+                placeholder="e.g. Send comps, schedule walkthrough"
+                value={form.nextStep}
+                onChange={(e) => handleChange('nextStep', e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="dt-nextStepDue">Due</label>
+              <input
+                id="dt-nextStepDue"
+                type="date"
+                value={form.nextStepDue}
+                onChange={(e) => handleChange('nextStepDue', e.target.value)}
+              />
+            </div>
           </div>
-          <div className="form-field">
-            <label htmlFor="dt-nextStepDue">Due</label>
-            <input
-              id="dt-nextStepDue"
-              type="date"
-              value={form.nextStepDue}
-              onChange={(e) => handleChange('nextStepDue', e.target.value)}
-            />
+          <div className="next-step-actions">
+            <button
+              type="button"
+              className="btn-link"
+              onClick={handleMarkComplete}
+              disabled={!hasNextStep}
+              title={
+                hasNextStep
+                  ? 'Clears the current Next Step and Due Date. Add a new one above or click Save Changes to leave empty.'
+                  : 'No active Next Step to complete.'
+              }
+            >
+              ✓ Mark Complete
+            </button>
+            <span className="next-step-hint">
+              Clears Next Step + Due Date. Add the next action above, or Save to
+              leave empty.
+            </span>
           </div>
         </div>
       </section>
