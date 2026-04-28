@@ -43,12 +43,6 @@ const CARD_ICONS: Record<TodayBucket, string> = {
   needs_next_step: '📋',
 };
 
-const ACTION_LABELS: Record<TodayBucket, string> = {
-  overdue: 'OVERDUE',
-  due_today: 'DUE TODAY',
-  needs_next_step: 'NEEDS NEXT STEP',
-};
-
 const PREVIEW_COUNT = 5;
 
 // Within a section, sort by next-step due (earliest first), then by client
@@ -253,7 +247,6 @@ export function TodayView({ onSelectDeal }: TodayViewProps) {
                         <th>Assigned To</th>
                         <th>Last Contact</th>
                         <th>Next Step / Due Date</th>
-                        <th className="today-table-action-col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -298,13 +291,6 @@ export function TodayView({ onSelectDeal }: TodayViewProps) {
                               >
                                 {due.text}
                               </div>
-                            </td>
-                            <td className="today-table-action-col">
-                              <span
-                                className={`today-action-badge today-action-badge--${key}`}
-                              >
-                                {ACTION_LABELS[key]}
-                              </span>
                             </td>
                           </tr>
                         );
