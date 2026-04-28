@@ -50,39 +50,57 @@ function pluralClient(n: number): string {
   return n === 1 ? 'client' : 'clients';
 }
 
-// Compose a short Badger Says briefing. Phrasing mirrors how an assistant
-// would prioritize the queue verbally — overdue first, then due-today, then
-// the missing-next-step cleanup.
+// Compose a short Badger Says briefing: a cheeky lead phrase sized to the
+// total workload, then a comma-separated action priority. Pulls counts only;
+// no new logic.
 function badgerSaysMessage(c: {
   overdue: number;
   due_today: number;
   needs_next_step: number;
 }): string {
   const total = c.overdue + c.due_today + c.needs_next_step;
+
   if (total === 0) {
-    return 'Nothing needs action today. Every active client has a Next Step and a Due Date in the future.';
+    return 'All caught up. Nothing on fire today.';
   }
 
-  const lead: string[] = [];
+  // Cheeky lead, sized by total. Tuned so the user's reference 28-client case
+  // ("Tiny chaos, manageable pile.") falls in the middle band.
+  let lead: string;
+  if (total === 1) lead = 'Just the one — easy.';
+  else if (total <= 5) lead = 'Small pile, knock it out.';
+  else if (total <= 30) lead = 'Tiny chaos, manageable pile.';
+  else if (total <= 60) lead = 'Real workload — pace yourself.';
+  else lead = 'Big day. Coffee up.';
+
+  // Action priority: overdue → due today → needs step. Verbs are lowercase
+  // by default; the first item gets capitalized after assembly.
+  const parts: string[] = [];
   if (c.overdue > 0) {
-    lead.push(`Start with ${c.overdue} overdue ${pluralClient(c.overdue)}`);
+    parts.push(`start with ${c.overdue} overdue ${pluralClient(c.overdue)}`);
   }
   if (c.due_today > 0) {
-    lead.push(
-      lead.length > 0
-        ? `then handle ${c.due_today} due today`
-        : `Handle ${c.due_today} due today`,
+    parts.push(`handle ${c.due_today} due today`);
+  }
+  if (c.needs_next_step > 0) {
+    parts.push(
+      `give ${c.needs_next_step} ${pluralClient(c.needs_next_step)} a next step`,
     );
   }
-  let s = lead.join(', ');
 
-  if (c.needs_next_step > 0) {
-    const tail = `${c.needs_next_step} ${pluralClient(c.needs_next_step)} missing a next step`;
-    s += s
-      ? `. After that, clean up the ${tail}`
-      : `Clean up the ${tail}`;
+  // Capitalize the first verb. Join with commas; insert "then " before the
+  // final item when there are 2+ to read naturally.
+  parts[0] = parts[0][0].toUpperCase() + parts[0].slice(1);
+  let action: string;
+  if (parts.length === 1) {
+    action = parts[0];
+  } else {
+    const last = parts[parts.length - 1];
+    const rest = parts.slice(0, -1);
+    action = `${rest.join(', ')}, then ${last}`;
   }
-  return s + '.';
+
+  return `${lead} ${action}.`;
 }
 
 interface DueLabel {
