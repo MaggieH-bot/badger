@@ -271,7 +271,7 @@ export function DealForm({ onClose }: DealFormProps) {
 
         <div className="form-field">
           <label htmlFor="df-probability">Probability</label>
-          <div className="form-suffix-input">
+          <div className="form-suffix-input form-suffix-input--narrow">
             <input
               id="df-probability"
               type="number"
@@ -369,7 +369,7 @@ export function DealForm({ onClose }: DealFormProps) {
         {showPriceRange && (
           <div className="form-row">
             <div className="form-field">
-              <label htmlFor="df-priceRangeLow">Price range — low</label>
+              <label htmlFor="df-priceRangeLow">Price Range Min</label>
               <input
                 id="df-priceRangeLow"
                 type="number"
@@ -380,7 +380,7 @@ export function DealForm({ onClose }: DealFormProps) {
               />
             </div>
             <div className="form-field">
-              <label htmlFor="df-priceRangeHigh">High</label>
+              <label htmlFor="df-priceRangeHigh">Price Range Max</label>
               <input
                 id="df-priceRangeHigh"
                 type="number"

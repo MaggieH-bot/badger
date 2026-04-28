@@ -302,7 +302,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
 
         <div className="form-field">
           <label htmlFor="dt-probability">Probability</label>
-          <div className="form-suffix-input">
+          <div className="form-suffix-input form-suffix-input--narrow">
             <input
               id="dt-probability"
               type="number"
@@ -397,7 +397,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
         {showPriceRange && (
           <div className="form-row">
             <div className="form-field">
-              <label htmlFor="dt-priceRangeLow">Price range — low</label>
+              <label htmlFor="dt-priceRangeLow">Price Range Min</label>
               <input
                 id="dt-priceRangeLow"
                 type="number"
@@ -408,7 +408,7 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
               />
             </div>
             <div className="form-field">
-              <label htmlFor="dt-priceRangeHigh">High</label>
+              <label htmlFor="dt-priceRangeHigh">Price Range Max</label>
               <input
                 id="dt-priceRangeHigh"
                 type="number"

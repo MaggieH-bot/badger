@@ -5,6 +5,7 @@ import {
 } from '../../constants/pipeline';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { displayAssignee } from '../../utils/assignee';
+import { formatPriceRange } from '../../utils/priceRange';
 
 interface DealCardProps {
   deal: DealWithUrgency;
@@ -23,17 +24,15 @@ function formatPriceShort(price: number): string {
 }
 
 // Card-level price summary, context-aware per Type × Stage.
+// Single prices use the K/M short form to save space on cards; buyer ranges
+// use the full comma format so the bounds read clearly.
 function priceSummary(deal: DealWithUrgency): string | null {
   if (deal.stage === 'closed' && deal.closedPrice !== undefined) {
     return formatPriceShort(deal.closedPrice);
   }
   if (deal.listPrice !== undefined) return formatPriceShort(deal.listPrice);
-  if (deal.priceRangeLow !== undefined || deal.priceRangeHigh !== undefined) {
-    const lo = deal.priceRangeLow !== undefined ? formatPriceShort(deal.priceRangeLow) : '';
-    const hi = deal.priceRangeHigh !== undefined ? formatPriceShort(deal.priceRangeHigh) : '';
-    if (lo && hi) return `${lo}–${hi}`;
-    return lo || hi || null;
-  }
+  const range = formatPriceRange(deal.priceRangeLow, deal.priceRangeHigh);
+  if (range) return range;
   if (deal.price !== undefined) return formatPriceShort(deal.price);
   return null;
 }

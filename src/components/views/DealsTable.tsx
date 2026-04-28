@@ -9,6 +9,7 @@ import { displayAssignee } from '../../utils/assignee';
 import { TeamFilterHiddenBanner } from './TeamFilterHiddenBanner';
 import { DealCard } from '../deals/DealCard';
 import { matchesSearch } from '../../utils/search';
+import { formatPriceRange } from '../../utils/priceRange';
 
 export type DealsTableMode = 'pipeline' | 'closed';
 
@@ -91,16 +92,15 @@ function displayPrice(deal: DealWithUrgency): number | undefined {
 }
 
 function formatPriceCell(deal: DealWithUrgency): string {
-  // Buyer ranges render as "$300K–$400K" rather than collapsing to midpoint.
+  // Buyer ranges use the locked range format ("$800,000 – $950,000",
+  // "$800,000+", or "Up to $950,000") so the bounds read clearly. Single
+  // prices stay in the column's compact currency format.
   if (
     deal.stage !== 'closed' &&
-    (deal.priceRangeLow !== undefined || deal.priceRangeHigh !== undefined) &&
     deal.listPrice === undefined
   ) {
-    const lo = deal.priceRangeLow !== undefined ? formatPrice(deal.priceRangeLow) : '';
-    const hi = deal.priceRangeHigh !== undefined ? formatPrice(deal.priceRangeHigh) : '';
-    if (lo && hi) return `${lo}–${hi}`;
-    return lo || hi;
+    const range = formatPriceRange(deal.priceRangeLow, deal.priceRangeHigh);
+    if (range) return range;
   }
   const p = displayPrice(deal);
   return p !== undefined ? formatPrice(p) : '';

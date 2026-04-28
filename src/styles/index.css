@@ -474,6 +474,12 @@ body {
   align-items: center;
 }
 
+/* Narrow variant: used for the Probability input where the value is at most
+   3 digits + "%". Keeps the field visually proportional to its content. */
+.form-suffix-input--narrow {
+  max-width: 120px;
+}
+
 .form-suffix-input input {
   flex: 1;
   padding-right: 28px;

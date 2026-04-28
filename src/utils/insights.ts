@@ -6,6 +6,7 @@ import type {
   OpportunityType,
 } from '../types';
 import { STAGE_LABELS, CATEGORY_LABELS } from '../constants/pipeline';
+import { formatPriceRange } from './priceRange';
 
 // ============================================
 // Helpers — build copy from existing fields, never leak undefined
@@ -106,15 +107,10 @@ function pricePhrase(d: Deal): string | null {
   ) {
     return formatPriceShort(d.listPrice);
   }
-  // Buy side
-  if (
-    (d.opportunityType === 'buy' || d.opportunityType === 'both') &&
-    (d.priceRangeLow !== undefined || d.priceRangeHigh !== undefined)
-  ) {
-    const lo = d.priceRangeLow !== undefined ? formatPriceShort(d.priceRangeLow) : '';
-    const hi = d.priceRangeHigh !== undefined ? formatPriceShort(d.priceRangeHigh) : '';
-    if (lo && hi) return `${lo}–${hi}`;
-    return lo || hi;
+  // Buy side — uses the locked range format with full comma values.
+  if (d.opportunityType === 'buy' || d.opportunityType === 'both') {
+    const range = formatPriceRange(d.priceRangeLow, d.priceRangeHigh);
+    if (range) return range;
   }
   // Legacy fallback
   if (d.price !== undefined && d.price > 0) {
