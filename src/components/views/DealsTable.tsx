@@ -129,13 +129,34 @@ function formatDueDateShort(iso: string): string {
   });
 }
 
+// Last-name sort key: take the last whitespace-separated token, strip
+// surrounding punctuation, lowercase. "Denise & Chris Hartzler" → "hartzler",
+// "ABC Realty LLC" → "llc" (V1 fallback for company/team names).
+// We pair it with a full-name tiebreaker so siblings sort stably.
+function lastNameKey(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  const parts = trimmed.split(/\s+/);
+  const last = parts[parts.length - 1];
+  // Trim leading/trailing non-alphanumerics; keep internal hyphens/apostrophes
+  // ("Beth-Smith", "O'Connor").
+  const cleaned = last.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  return (cleaned || trimmed).toLowerCase();
+}
+
 function compareDeal(a: DealWithUrgency, b: DealWithUrgency, key: SortKey, dir: SortDir): number {
   let cmp = 0;
 
   switch (key) {
-    case 'clientName':
-      cmp = a.clientName.localeCompare(b.clientName);
+    case 'clientName': {
+      // Sort by last name (last whitespace-separated token), with full-name as
+      // a tiebreaker so two "Smith" households retain a stable order.
+      const ak = lastNameKey(a.clientName);
+      const bk = lastNameKey(b.clientName);
+      cmp = ak.localeCompare(bk);
+      if (cmp === 0) cmp = a.clientName.localeCompare(b.clientName);
       break;
+    }
     case 'category':
       cmp = CATEGORY_SORT_ORDER[a.category] - CATEGORY_SORT_ORDER[b.category];
       break;
@@ -181,10 +202,10 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   const isClosed = mode === 'closed';
   const columns = isClosed ? CLOSED_COLUMNS : PIPELINE_COLUMNS;
 
-  // Default sort: pipeline goes by Due Date asc (most urgent first); closed
-  // keeps the prior Last-Contact-desc behavior.
+  // Default sort: pipeline goes by client last name A–Z; closed keeps the
+  // prior Last-Contact-desc behavior.
   const [sortKey, setSortKey] = useState<SortKey>(
-    isClosed ? 'daysSinceContact' : 'dueDate',
+    isClosed ? 'daysSinceContact' : 'clientName',
   );
   const [sortDir, setSortDir] = useState<SortDir>(
     isClosed ? 'desc' : 'asc',
