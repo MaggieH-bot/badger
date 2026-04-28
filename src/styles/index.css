@@ -703,28 +703,403 @@ body {
   color: var(--category-watch);
 }
 
-/* Action-bucket section headers — borrow tone from the cadence palette so
-   Overdue reads as urgent (hot), Due Today as warm (nurture), and Needs Next
-   Step as background (watch). */
+/* Action-bucket section headers — Overdue is red (alert), Due Today orange
+   (hot), Needs Next Step gold (nurture). Avoid green (watch) for Needs Next
+   Step per product direction. */
 .today-section-header--overdue {
+  background: var(--alert-bg);
+  color: var(--alert);
+}
+
+.today-section-header--due_today {
   background: var(--category-hot-bg);
   color: var(--category-hot);
 }
 
-.today-section-header--due_today {
+.today-section-header--needs_next_step {
   background: var(--category-nurture-bg);
   color: var(--category-nurture);
-}
-
-.today-section-header--needs_next_step {
-  background: var(--category-watch-bg);
-  color: var(--category-watch);
 }
 
 .today-section-help {
   font-size: 13px;
   color: var(--text-muted);
   margin: 4px 0 12px;
+}
+
+/* ============================================
+   Today View — Action dashboard (revamped)
+   ============================================ */
+
+.today-header {
+  margin-bottom: var(--space-md);
+}
+
+.today-header-summary {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.today-header-count {
+  color: var(--alert);
+  font-weight: 700;
+}
+
+.today-summary--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.today-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.today-card:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.today-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.today-card--overdue {
+  border-color: var(--alert);
+  background: linear-gradient(135deg, var(--alert-bg) 0%, transparent 70%);
+}
+
+.today-card--due_today {
+  border-color: var(--category-hot);
+  background: linear-gradient(135deg, var(--category-hot-bg) 0%, transparent 70%);
+}
+
+.today-card--needs_next_step {
+  border-color: var(--category-nurture);
+  background: linear-gradient(135deg, var(--category-nurture-bg) 0%, transparent 70%);
+}
+
+.today-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.today-card--overdue .today-card-icon {
+  color: var(--alert);
+  background: var(--alert-bg);
+}
+
+.today-card--due_today .today-card-icon {
+  color: var(--category-hot);
+  background: var(--category-hot-bg);
+}
+
+.today-card--needs_next_step .today-card-icon {
+  color: var(--category-nurture);
+  background: var(--category-nurture-bg);
+}
+
+.today-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.today-card-count {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.today-card-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+
+.today-card-caption {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.today-card-chevron {
+  color: var(--text-muted);
+  font-size: 20px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* --- Section header (icon + title + count + view-all) --- */
+
+.today-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.today-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.today-section-icon {
+  font-size: 18px;
+}
+
+.today-section--overdue .today-section-icon,
+.today-section--overdue .today-section-title {
+  color: var(--alert);
+}
+
+.today-section--due_today .today-section-icon,
+.today-section--due_today .today-section-title {
+  color: var(--category-hot);
+}
+
+.today-section--needs_next_step .today-section-icon,
+.today-section--needs_next_step .today-section-title {
+  color: var(--category-nurture);
+}
+
+.today-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.today-section-viewall {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: inherit;
+}
+
+.today-section-viewall:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.today-section-showmore {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.today-section-showmore:hover {
+  background: var(--bg-hover);
+  color: var(--accent-hover);
+}
+
+/* --- Section table --- */
+
+.today-table-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.today-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.today-table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.today-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.today-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.today-table-row {
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.today-table-row:hover {
+  background: var(--bg-hover);
+}
+
+.today-table-td--name {
+  font-weight: 600;
+}
+
+.today-table-td--nextstep {
+  min-width: 200px;
+}
+
+.today-table-action-col {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.today-nextstep-text {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.today-due-label {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.today-due-label--overdue {
+  color: var(--alert);
+  font-weight: 600;
+}
+
+.today-due-label--due_today {
+  color: var(--category-hot);
+  font-weight: 600;
+}
+
+.today-due-label--muted {
+  color: var(--text-muted);
+}
+
+/* --- Action badges --- */
+
+.today-action-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.today-action-badge--overdue {
+  background: var(--alert-bg);
+  color: var(--alert);
+  border: 1px solid var(--alert);
+}
+
+.today-action-badge--due_today {
+  background: var(--category-hot-bg);
+  color: var(--category-hot);
+  border: 1px solid var(--category-hot);
+}
+
+.today-action-badge--needs_next_step {
+  background: var(--category-nurture-bg);
+  color: var(--category-nurture);
+  border: 1px solid var(--category-nurture);
+}
+
+/* --- Bottom info banner --- */
+
+.today-info-banner {
+  margin-top: var(--space-lg);
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.today-info-banner strong {
+  color: var(--text-secondary);
+}
+
+.today-info-icon {
+  color: var(--accent);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* --- Mobile: collapse the table to stacked rows --- */
+@media (max-width: 768px) {
+  .today-summary--three {
+    grid-template-columns: 1fr;
+  }
+
+  .today-table thead {
+    display: none;
+  }
+
+  .today-table tbody td {
+    display: block;
+    padding: 6px 14px;
+    border-bottom: none;
+  }
+
+  .today-table tbody tr {
+    display: block;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .today-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .today-table-action-col {
+    text-align: left;
+  }
 }
 
 .today-section-empty {
