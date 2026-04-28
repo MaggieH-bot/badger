@@ -756,6 +756,7 @@ body {
 
 .deal-card--closed {
   opacity: 0.6;
+  border-left: 3px solid var(--border-strong);
 }
 
 .deal-card-header {
@@ -827,6 +828,27 @@ body {
 .category-badge--watch {
   background: var(--category-watch-bg);
   color: var(--category-watch);
+}
+
+/* --- Status badge — for terminal states like Closed.
+   Shape mirrors .category-badge so it slots into the same UI positions
+   without colliding with active-pipeline category colors. --- */
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px var(--space-sm);
+  border-radius: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.status-badge--closed {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
 }
 
 /* --- Attention pill (secondary follow-up signal) --- */

@@ -59,12 +59,19 @@ export function DealCard({ deal, onClick }: DealCardProps) {
 
   return (
     <button
-      className={`deal-card deal-card--${deal.category}${isClosed ? ' deal-card--closed' : ''}`}
+      className={
+        isClosed
+          ? 'deal-card deal-card--closed'
+          : `deal-card deal-card--${deal.category}`
+      }
       onClick={() => onClick(deal.id)}
       type="button"
     >
       <div className="deal-card-header">
         <span className="deal-card-name">{deal.clientName}</span>
+        {isClosed && (
+          <span className="status-badge status-badge--closed">Closed</span>
+        )}
         {deal.opportunityType && (
           <span
             className={`opp-type-pill opp-type-pill--${deal.opportunityType}`}
@@ -73,7 +80,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
             {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
           </span>
         )}
-        {showAttention && (
+        {showAttention && !isClosed && (
           <span className="attention-pill">Needs Attn</span>
         )}
       </div>

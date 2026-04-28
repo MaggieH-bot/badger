@@ -55,6 +55,17 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
     onClose();
   }
 
+  // Switching tabs while Details has unsaved edits would unmount DetailsTab
+  // and lose the form state silently. Prompt before switching away.
+  function requestTabChange(next: DrawerTab) {
+    if (next === activeTab) return;
+    if (activeTab === 'details' && detailsRef.current?.isDirty()) {
+      const ok = window.confirm('Discard unsaved changes?');
+      if (!ok) return;
+    }
+    setActiveTab(next);
+  }
+
   // Auto-close if deal no longer exists (data-driven; no prompt).
   useEffect(() => {
     if (!deal) {
@@ -125,12 +136,18 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
         </div>
 
         <div className="drawer-summary">
-          <span className={`category-badge category-badge--${deal.category}`}>
-            {CATEGORY_LABELS[deal.category]}
-          </span>
-          <span className="drawer-summary-item">
-            {STAGE_LABELS[deal.stage]}
-          </span>
+          {deal.stage === 'closed' ? (
+            <span className="status-badge status-badge--closed">Closed</span>
+          ) : (
+            <span className={`category-badge category-badge--${deal.category}`}>
+              {CATEGORY_LABELS[deal.category]}
+            </span>
+          )}
+          {deal.stage !== 'closed' && (
+            <span className="drawer-summary-item">
+              {STAGE_LABELS[deal.stage]}
+            </span>
+          )}
           <span className="drawer-summary-item">
             {displayAssignee(deal.assignedTo, members)}
           </span>
@@ -148,7 +165,7 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
             <button
               key={tab.key}
               className={`drawer-tab${activeTab === tab.key ? ' drawer-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => requestTabChange(tab.key)}
               type="button"
             >
               {tab.label}
@@ -163,7 +180,7 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
               ref={detailsRef}
               deal={deal}
               onDeleted={onClose}
-              onOpenActivity={() => setActiveTab('activity')}
+              onOpenActivity={() => requestTabChange('activity')}
             />
           )}
           {activeTab === 'activity' && <ActivityTab key={deal.id} deal={deal} />}

@@ -266,9 +266,13 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
             >
               <td className="deals-table-td deals-table-td--name">{deal.clientName}</td>
               <td className="deals-table-td">
-                <span className={`category-badge category-badge--${deal.category}`}>
-                  {CATEGORY_LABELS[deal.category]}
-                </span>
+                {deal.stage === 'closed' ? (
+                  <span className="status-badge status-badge--closed">Closed</span>
+                ) : (
+                  <span className={`category-badge category-badge--${deal.category}`}>
+                    {CATEGORY_LABELS[deal.category]}
+                  </span>
+                )}
               </td>
               <td className="deals-table-td">
                 {deal.opportunityType ? (
