@@ -15,7 +15,7 @@ import {
 import { useDeals } from '../../store/useDeals';
 import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
-import { buildAssigneeOptions, isLegacyAssignee } from '../../utils/assignee';
+import { buildAssigneeOptions, normalizeAssigneeForForm } from '../../utils/assignee';
 import {
   shouldShowAddress,
   shouldShowSellerPrice,
@@ -84,16 +84,16 @@ export function DetailsTab({ deal, onSaved, onDeleted, onOpenActivity }: Details
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
 
   const currentUserId = user?.id ?? null;
-  // Pass through any legacy assigned_to value the deal currently has so the
-  // dropdown can show it as "(legacy)" without offering it as a new choice.
-  const legacyValueInUse = isLegacyAssignee(form.assignedTo)
-    ? form.assignedTo
-    : undefined;
-  const assigneeOptions = buildAssigneeOptions(
-    members,
-    currentUserId,
-    legacyValueInUse,
-  );
+  const assigneeOptions = buildAssigneeOptions(members, currentUserId);
+
+  // Normalize the form's stored assigned_to once members load. Legacy "You"
+  // resolves to the workspace owner's UUID; other legacy / unknown values
+  // resolve to "" (Unassigned). This silently migrates the form state without
+  // touching the database until the user clicks Save.
+  const normalizedAssigned = normalizeAssigneeForForm(form.assignedTo, members);
+  if (members.length > 0 && normalizedAssigned !== form.assignedTo) {
+    setForm((f) => ({ ...f, assignedTo: normalizedAssigned }));
+  }
 
   const typeOrUndef: OpportunityType | undefined =
     (form.opportunityType as OpportunityType | '') || undefined;

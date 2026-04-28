@@ -1,8 +1,8 @@
+import { useEffect } from 'react';
 import type { AppRoute, TeamFilter } from '../../types';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
-import { isLegacyAssignee } from '../../utils/assignee';
 
 interface NavBarProps {
   route: AppRoute;
@@ -37,28 +37,29 @@ export function NavBar({ route, navigate, onAddDeal }: NavBarProps) {
     if (b.userId === currentUserId) return 1;
     return (a.email ?? a.userId).localeCompare(b.email ?? b.userId);
   });
+  // Filter options are All + every member that has an email we can show.
+  // Members we can't identify are excluded so the dropdown never reads
+  // "Workspace member" or any legacy placeholder.
   const filterOptions: FilterOption[] = [
     { value: 'All', label: 'All' },
-    ...sortedMembers.map((m) => ({
-      value: m.userId as TeamFilter,
-      label:
-        m.userId === currentUserId
-          ? `You${m.email ? ` (${m.email})` : ''}`
-          : m.email ?? 'Workspace member',
-    })),
+    ...sortedMembers
+      .filter((m) => m.email && m.email.trim())
+      .map((m) => ({
+        value: m.userId as TeamFilter,
+        label: m.email ?? '',
+      })),
   ];
 
-  // If the persisted filter is a legacy hardcoded value (Partner / TC / VA /
-  // 'You' string), append it as a one-time selectable option so the user can
-  // see what's set and clear it. New selections come from real members above.
+  // If a stale filter value is persisted (legacy 'Partner' / 'You' / unknown
+  // UUID), reset it to 'All' so the dropdown isn't out of sync with what the
+  // user can actually pick.
   const persisted = preferences.activeTeamFilter;
-  if (
-    persisted !== 'All' &&
-    isLegacyAssignee(persisted) &&
-    !filterOptions.some((opt) => opt.value === persisted)
-  ) {
-    filterOptions.push({ value: persisted, label: `${persisted} (legacy)` });
-  }
+  const persistedValid = filterOptions.some((opt) => opt.value === persisted);
+  useEffect(() => {
+    if (!persistedValid && members.length > 0) {
+      dispatch({ type: 'SET_TEAM_FILTER', filter: 'All' });
+    }
+  }, [persistedValid, members.length, dispatch]);
 
   return (
     <nav className="navbar">

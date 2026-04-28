@@ -3,7 +3,6 @@ import {
   STAGE_LABELS,
   OPPORTUNITY_TYPE_LABELS,
 } from '../../constants/pipeline';
-import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { displayAssignee } from '../../utils/assignee';
 
@@ -44,7 +43,6 @@ function dueLabel(due: string): string {
 }
 
 export function DealCard({ deal, onClick }: DealCardProps) {
-  const { user } = useAuth();
   const { members } = useWorkspaceMembers();
 
   const daysLabel = deal.neverContacted
@@ -58,7 +56,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
   const isClosed = deal.stage === 'closed';
   const showAttention = deal.followUpStatus === 'needs_attention';
   const price = priceSummary(deal);
-  const assigneeLabel = displayAssignee(deal.assignedTo, members, user?.id ?? null);
+  const assigneeLabel = displayAssignee(deal.assignedTo, members);
 
   return (
     <button

@@ -182,16 +182,52 @@ export interface WorkspaceMember {
 export async function listWorkspaceMembers(
   workspaceId: string,
 ): Promise<WorkspaceMember[]> {
-  const { data, error } = await supabase
-    .from('workspace_members')
-    .select('user_id, role, email, created_at')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    userId: row.user_id as string,
-    role: row.role as string,
-    email: (row.email as string | null) ?? null,
-    joinedAt: row.created_at as string,
-  }));
+  // Fetch members + accepted invites in parallel. Invites carry email; members
+  // may not (until each user logs in once post-migration). For each member
+  // whose email column is null, fall back to the next unmatched accepted
+  // invite email so the UI can show real identities immediately.
+  const [memberResult, inviteResult] = await Promise.all([
+    supabase
+      .from('workspace_members')
+      .select('user_id, role, email, created_at')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('workspace_invites')
+      .select('email, accepted_at, created_at')
+      .eq('workspace_id', workspaceId)
+      .not('accepted_at', 'is', null)
+      .order('created_at', { ascending: true }),
+  ]);
+
+  if (memberResult.error) throw memberResult.error;
+  if (inviteResult.error) throw inviteResult.error;
+
+  const memberRows = memberResult.data ?? [];
+  const inviteRows = inviteResult.data ?? [];
+
+  const knownEmails = new Set<string>();
+  for (const m of memberRows) {
+    const e = (m.email as string | null) ?? null;
+    if (e) knownEmails.add(e.toLowerCase());
+  }
+
+  // Accepted invite emails not already represented by a member's email column.
+  const fallbackQueue = inviteRows
+    .map((i) => (i.email as string | null) ?? null)
+    .filter((e): e is string => !!e && !knownEmails.has(e.toLowerCase()));
+
+  let queueIdx = 0;
+  return memberRows.map((row) => {
+    let email = (row.email as string | null) ?? null;
+    if (!email && queueIdx < fallbackQueue.length) {
+      email = fallbackQueue[queueIdx++];
+    }
+    return {
+      userId: row.user_id as string,
+      role: row.role as string,
+      email,
+      joinedAt: row.created_at as string,
+    };
+  });
 }

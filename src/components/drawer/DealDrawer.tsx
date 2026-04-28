@@ -3,7 +3,6 @@ import type { Deal } from '../../types';
 import { STAGE_LABELS, CATEGORY_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
-import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { computeUrgency } from '../../utils/urgency';
 import { computeInsight } from '../../utils/insights';
@@ -38,7 +37,6 @@ function formatLastContact(iso: string): string {
 export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
-  const { user } = useAuth();
   const { members } = useWorkspaceMembers();
   const [activeTab, setActiveTab] = useState<DrawerTab>('details');
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -118,7 +116,7 @@ export function DealDrawer({ dealId, onClose }: DealDrawerProps) {
             {STAGE_LABELS[deal.stage]}
           </span>
           <span className="drawer-summary-item">
-            {displayAssignee(deal.assignedTo, members, user?.id ?? null)}
+            {displayAssignee(deal.assignedTo, members)}
           </span>
           <span className="drawer-summary-item">{lastContactDisplay}</span>
         </div>
