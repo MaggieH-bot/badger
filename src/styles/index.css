@@ -153,9 +153,15 @@ body {
 
 .navbar-brand {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   white-space: nowrap;
+}
+
+.navbar-brand-icon {
+  flex-shrink: 0;
+  display: block;
 }
 
 .navbar-brand-name {
@@ -1069,6 +1075,255 @@ body {
   color: var(--accent);
   font-size: 16px;
   flex-shrink: 0;
+}
+
+/* ============================================
+   Today View — Unified priority list
+   ============================================ */
+
+/* Compact Badger Says strip — borrows the today-info-banner pattern but with
+   an emphasized title and the brand mark. */
+.badger-says {
+  margin-bottom: var(--space-md);
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.badger-says-mark {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badger-says-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.badger-says-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+/* Filter chips — pill buttons, color the border by bucket; active state
+   fills the chip. Disabled chips (count=0) fade. */
+.today-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+}
+
+.today-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.today-chip:not(:disabled):hover {
+  background: var(--bg-hover);
+}
+
+.today-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.today-chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.today-chip--overdue {
+  border-color: var(--alert);
+}
+.today-chip--overdue.today-chip--active {
+  background: var(--alert-bg);
+  color: var(--alert);
+}
+.today-chip--overdue.today-chip--active .today-chip-count {
+  background: var(--alert);
+  color: var(--text-primary);
+}
+
+.today-chip--due_today {
+  border-color: var(--category-hot);
+}
+.today-chip--due_today.today-chip--active {
+  background: var(--category-hot-bg);
+  color: var(--category-hot);
+}
+.today-chip--due_today.today-chip--active .today-chip-count {
+  background: var(--category-hot);
+  color: var(--text-primary);
+}
+
+.today-chip--needs_next_step {
+  border-color: var(--category-nurture);
+}
+.today-chip--needs_next_step.today-chip--active {
+  background: var(--category-nurture-bg);
+  color: var(--category-nurture);
+}
+.today-chip--needs_next_step.today-chip--active .today-chip-count {
+  background: var(--category-nurture);
+  color: var(--text-primary);
+}
+
+.today-chip--all.today-chip--active {
+  background: var(--accent-muted);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.today-chip--all.today-chip--active .today-chip-count {
+  background: var(--accent);
+  color: var(--text-primary);
+}
+
+/* Unified list — reuses the visual rhythm of .today-table with a slightly
+   different cell layout (Reason badge col + collapsed Details col). */
+.today-list-wrap {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.today-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.today-list thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.today-list tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--text-primary);
+}
+
+.today-list tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.today-list-row {
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.today-list-row:hover {
+  background: var(--bg-hover);
+}
+
+.today-list-td--name {
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.today-list-td--nextstep {
+  min-width: 200px;
+}
+
+.today-list-td--details {
+  color: var(--text-secondary);
+  font-size: 12px;
+  min-width: 240px;
+}
+
+.today-details-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.today-details-line + .today-details-line {
+  margin-top: 4px;
+}
+
+.today-details-line--muted {
+  color: var(--text-muted);
+}
+
+.today-details-sep {
+  color: var(--text-muted);
+}
+
+.today-details-cat--hot {
+  color: var(--category-hot);
+  font-weight: 600;
+}
+
+.today-details-cat--nurture {
+  color: var(--category-nurture);
+  font-weight: 600;
+}
+
+.today-details-cat--watch {
+  color: var(--category-watch);
+  font-weight: 600;
+}
+
+/* Mobile: stack the unified list rows. */
+@media (max-width: 768px) {
+  .today-list thead {
+    display: none;
+  }
+  .today-list tbody td {
+    display: block;
+    padding: 4px 14px;
+    border-bottom: none;
+  }
+  .today-list tbody tr {
+    display: block;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .today-list tbody tr:last-child {
+    border-bottom: none;
+  }
 }
 
 /* --- Mobile: collapse the table to stacked rows --- */

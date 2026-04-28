@@ -65,6 +65,28 @@ export function NavBar({ route, navigate, onAddDeal }: NavBarProps) {
     <nav className="navbar">
       <div className="navbar-row navbar-row--top">
         <div className="navbar-brand">
+          {/* Temporary brand icon — simple stylized "badger stripes" mark on a
+              rounded square. Replace with a real asset when one exists. */}
+          <svg
+            className="navbar-brand-icon"
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
+            aria-hidden="true"
+          >
+            <rect
+              x="2"
+              y="2"
+              width="24"
+              height="24"
+              rx="6"
+              fill="var(--bg-elevated)"
+              stroke="var(--accent)"
+              strokeWidth="1.5"
+            />
+            <rect x="9" y="7" width="2.5" height="14" rx="1.25" fill="var(--accent)" />
+            <rect x="16.5" y="7" width="2.5" height="14" rx="1.25" fill="var(--accent)" />
+          </svg>
           <span className="navbar-brand-name">BADGER</span>
         </div>
         <div className="navbar-actions">

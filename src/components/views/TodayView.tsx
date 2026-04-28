@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import type { AppRoute, DealWithUrgency } from '../../types';
 import {
   STAGE_LABELS,
@@ -18,56 +18,71 @@ import { displayAssignee } from '../../utils/assignee';
 
 interface TodayViewProps {
   onSelectDeal: (dealId: string) => void;
-  // navigate is unused now but App.tsx still passes it. Keeping the prop
-  // avoids touching unrelated code.
+  // navigate is unused here but App.tsx still passes it.
   navigate: (to: AppRoute) => void;
 }
 
-const SECTION_ORDER: TodayBucket[] = ['overdue', 'due_today', 'needs_next_step'];
+type TodayChip = 'all' | TodayBucket;
 
-const SECTION_TITLES: Record<TodayBucket, string> = {
+const REASON_LABELS: Record<TodayBucket, string> = {
+  overdue: 'OVERDUE',
+  due_today: 'DUE TODAY',
+  needs_next_step: 'NEEDS STEP',
+};
+
+const CHIP_LABELS: Record<TodayChip, string> = {
+  all: 'All',
   overdue: 'Overdue',
   due_today: 'Due Today',
-  needs_next_step: 'Needs Next Step',
+  needs_next_step: 'Needs Step',
 };
 
-const CARD_CAPTIONS: Record<TodayBucket, string> = {
-  overdue: 'Next Step Due Date is in the past',
-  due_today: 'Next Step Due Date is today',
-  needs_next_step: 'Missing Next Step or Due Date',
+// Bucket precedence drives both default sort and the order chips/buckets
+// appear in. Closed records and anything not matching one of the three
+// predicates is omitted from Today entirely.
+const BUCKET_PRECEDENCE: Record<TodayBucket, number> = {
+  overdue: 0,
+  due_today: 1,
+  needs_next_step: 2,
 };
 
-const CARD_ICONS: Record<TodayBucket, string> = {
-  overdue: '⏰',
-  due_today: '📅',
-  needs_next_step: '📋',
-};
-
-const PREVIEW_COUNT = 5;
-
-// Within a section, sort by next-step due (earliest first), then by client
-// name. needs_next_step has no due date, so we fall through to name.
-function sortBucket(deals: DealWithUrgency[]): DealWithUrgency[] {
-  return [...deals].sort((a, b) => {
-    const ad = a.nextStepDue ?? '';
-    const bd = b.nextStepDue ?? '';
-    if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
-    if (ad && !bd) return -1;
-    if (!ad && bd) return 1;
-    return a.clientName.localeCompare(b.clientName);
-  });
+function pluralClient(n: number): string {
+  return n === 1 ? 'client' : 'clients';
 }
 
-function formatDueShort(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+// Compose a short Badger Says briefing. Phrasing mirrors how an assistant
+// would prioritize the queue verbally — overdue first, then due-today, then
+// the missing-next-step cleanup.
+function badgerSaysMessage(c: {
+  overdue: number;
+  due_today: number;
+  needs_next_step: number;
+}): string {
+  const total = c.overdue + c.due_today + c.needs_next_step;
+  if (total === 0) {
+    return 'Nothing needs action today. Every active client has a Next Step and a Due Date in the future.';
+  }
 
-function lastContactText(deal: DealWithUrgency): string {
-  if (deal.neverContacted) return 'Never contacted';
-  if (deal.daysSinceContact === 0) return 'today';
-  if (deal.daysSinceContact === 1) return '1 day ago';
-  return `${deal.daysSinceContact} days ago`;
+  const lead: string[] = [];
+  if (c.overdue > 0) {
+    lead.push(`Start with ${c.overdue} overdue ${pluralClient(c.overdue)}`);
+  }
+  if (c.due_today > 0) {
+    lead.push(
+      lead.length > 0
+        ? `then handle ${c.due_today} due today`
+        : `Handle ${c.due_today} due today`,
+    );
+  }
+  let s = lead.join(', ');
+
+  if (c.needs_next_step > 0) {
+    const tail = `${c.needs_next_step} ${pluralClient(c.needs_next_step)} missing a next step`;
+    s += s
+      ? `. After that, clean up the ${tail}`
+      : `Clean up the ${tail}`;
+  }
+  return s + '.';
 }
 
 interface DueLabel {
@@ -75,252 +90,238 @@ interface DueLabel {
   tone: 'overdue' | 'due_today' | 'muted';
 }
 
+function formatDueShort(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function dueLabelFor(deal: DealWithUrgency, bucket: TodayBucket): DueLabel {
   if (bucket === 'needs_next_step') {
-    return { text: 'Missing Next Step and Due Date', tone: 'muted' };
+    return { text: 'Missing Due Date', tone: 'muted' };
   }
   if (!deal.nextStepDue) {
     return { text: '—', tone: 'muted' };
   }
   const formatted = formatDueShort(deal.nextStepDue);
   if (bucket === 'overdue') {
-    return { text: `${formatted} (Past Due)`, tone: 'overdue' };
+    return { text: `${formatted} · Past Due`, tone: 'overdue' };
   }
-  return { text: `${formatted} (Today)`, tone: 'due_today' };
+  return { text: `${formatted} · Today`, tone: 'due_today' };
+}
+
+function lastContactText(deal: DealWithUrgency): string {
+  if (deal.neverContacted) return 'Never contacted';
+  if (deal.daysSinceContact === 0) return 'Last contact: today';
+  if (deal.daysSinceContact === 1) return 'Last contact: 1 day ago';
+  return `Last contact: ${deal.daysSinceContact} days ago`;
+}
+
+interface ActionRow extends DealWithUrgency {
+  bucket: TodayBucket;
 }
 
 export function TodayView({ onSelectDeal }: TodayViewProps) {
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
   const { members } = useWorkspaceMembers();
-  const sectionRefs = useRef<Record<TodayBucket, HTMLElement | null>>({
-    overdue: null,
-    due_today: null,
-    needs_next_step: null,
-  });
+  const [chip, setChip] = useState<TodayChip>('all');
 
-  // Per-section "expanded" toggle. Sections show a 5-row preview by default;
-  // expanding reveals the rest.
-  const [expanded, setExpanded] = useState<Record<TodayBucket, boolean>>({
-    overdue: false,
-    due_today: false,
-    needs_next_step: false,
-  });
-
-  // Active deals only; closed records are excluded from Today entirely.
+  // Active deals only; closed records are excluded entirely.
   const activeDeals = deals.filter((d) => d.stage !== 'closed');
 
-  // Then apply team filter for the count surfaced in the banner.
   const filtered = activeDeals.filter(
     (d) =>
       preferences.activeTeamFilter === 'All' ||
       d.assignedTo === preferences.activeTeamFilter,
   );
-
   const hiddenByTeamFilter = activeDeals.length - filtered.length;
   const withUrgency = filtered.map((d) => computeUrgency(d));
 
-  // Bucketize once. Mutually exclusive precedence: Overdue → Due Today →
-  // Needs Next Step. Any deal not matching one of these three is omitted.
-  const buckets: Record<TodayBucket, DealWithUrgency[]> = {
-    overdue: [],
-    due_today: [],
-    needs_next_step: [],
-  };
+  // Bucketize → ActionRow array. Mutually exclusive precedence (Overdue →
+  // Due Today → Needs Next Step) is enforced by todayBucket().
+  const rows: ActionRow[] = [];
   for (const d of withUrgency) {
-    const key = todayBucket(d);
-    if (key) buckets[key].push(d);
+    const bucket = todayBucket(d);
+    if (bucket) rows.push({ ...d, bucket });
   }
-  for (const key of SECTION_ORDER) {
-    buckets[key] = sortBucket(buckets[key]);
-  }
+
+  // Default sort: bucket precedence, then due date asc, then client name. The
+  // result is the same list whether the user is on All or has filtered to a
+  // single bucket — filtering just hides rows.
+  rows.sort((a, b) => {
+    const bp = BUCKET_PRECEDENCE[a.bucket] - BUCKET_PRECEDENCE[b.bucket];
+    if (bp !== 0) return bp;
+    const ad = a.nextStepDue ?? '';
+    const bd = b.nextStepDue ?? '';
+    if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+    if (ad && !bd) return -1;
+    if (!ad && bd) return 1;
+    return a.clientName.localeCompare(b.clientName);
+  });
 
   const counts: Record<TodayBucket, number> = {
-    overdue: buckets.overdue.length,
-    due_today: buckets.due_today.length,
-    needs_next_step: buckets.needs_next_step.length,
+    overdue: 0,
+    due_today: 0,
+    needs_next_step: 0,
   };
-  const totalNeedsAction =
-    counts.overdue + counts.due_today + counts.needs_next_step;
+  for (const r of rows) counts[r.bucket] += 1;
+  const total = rows.length;
 
-  function jumpToSection(key: TodayBucket) {
-    const el = sectionRefs.current[key];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  const visibleRows = chip === 'all' ? rows : rows.filter((r) => r.bucket === chip);
 
-  function expandSection(key: TodayBucket) {
-    setExpanded((prev) => ({ ...prev, [key]: true }));
-  }
+  const chipBadgeCount: Record<TodayChip, number> = {
+    all: total,
+    overdue: counts.overdue,
+    due_today: counts.due_today,
+    needs_next_step: counts.needs_next_step,
+  };
 
-  const hasAny = withUrgency.length > 0;
-  const populatedSections = SECTION_ORDER.filter((k) => buckets[k].length > 0);
+  const briefing = badgerSaysMessage(counts);
 
   return (
     <div className="view today-view">
       <header className="today-header">
         <h2>Today</h2>
         <p className="today-header-summary">
-          <strong className="today-header-count">{totalNeedsAction}</strong>{' '}
-          {totalNeedsAction === 1 ? 'client needs action' : 'clients need action'}
+          <strong className="today-header-count">{total}</strong>{' '}
+          {pluralClient(total)} need{total === 1 ? 's' : ''} action
         </p>
       </header>
 
       <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope="active" />
 
-      <div className="today-summary today-summary--three">
-        {SECTION_ORDER.map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={`today-card today-card--${key}`}
-            disabled={counts[key] === 0}
-            onClick={() => jumpToSection(key)}
-            aria-label={`${SECTION_TITLES[key]} — ${counts[key]} ${
-              counts[key] === 1 ? 'client' : 'clients'
-            }`}
-          >
-            <span className="today-card-icon" aria-hidden="true">
-              {CARD_ICONS[key]}
-            </span>
-            <span className="today-card-body">
-              <span className="today-card-count">{counts[key]}</span>
-              <span className="today-card-label">{SECTION_TITLES[key]}</span>
-              <span className="today-card-caption">{CARD_CAPTIONS[key]}</span>
-            </span>
-            <span className="today-card-chevron" aria-hidden="true">›</span>
-          </button>
-        ))}
+      <aside className="badger-says" role="note">
+        <span className="badger-says-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 28 28">
+            <rect
+              x="2"
+              y="2"
+              width="24"
+              height="24"
+              rx="6"
+              fill="var(--bg-elevated)"
+              stroke="var(--accent)"
+              strokeWidth="1.5"
+            />
+            <rect x="9" y="7" width="2.5" height="14" rx="1.25" fill="var(--accent)" />
+            <rect x="16.5" y="7" width="2.5" height="14" rx="1.25" fill="var(--accent)" />
+          </svg>
+        </span>
+        <div className="badger-says-body">
+          <span className="badger-says-title">Badger Says</span>
+          <span className="badger-says-text">{briefing}</span>
+        </div>
+      </aside>
+
+      <div className="today-chips" role="tablist" aria-label="Filter by reason">
+        {(['all', 'overdue', 'due_today', 'needs_next_step'] as TodayChip[]).map(
+          (c) => {
+            const active = c === chip;
+            const count = chipBadgeCount[c];
+            const disabled = c !== 'all' && count === 0;
+            return (
+              <button
+                key={c}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                disabled={disabled}
+                className={
+                  'today-chip ' +
+                  (c === 'all' ? 'today-chip--all' : `today-chip--${c}`) +
+                  (active ? ' today-chip--active' : '')
+                }
+                onClick={() => setChip(c)}
+              >
+                <span className="today-chip-label">{CHIP_LABELS[c]}</span>
+                <span className="today-chip-count">{count}</span>
+              </button>
+            );
+          },
+        )}
       </div>
 
-      {!hasAny ? (
+      {total === 0 ? (
         <div className="empty-state">
-          <p>No active clients.</p>
-          <p>Click "+ Add Client" to create your first client.</p>
+          {withUrgency.length === 0 ? (
+            <>
+              <p>No active clients.</p>
+              <p>Click "+ Add Client" to create your first client.</p>
+            </>
+          ) : (
+            <>
+              <p>Nothing needs action today.</p>
+              <p>Every active client has a Next Step and Due Date in the future.</p>
+            </>
+          )}
         </div>
-      ) : totalNeedsAction === 0 ? (
+      ) : visibleRows.length === 0 ? (
         <div className="empty-state">
-          <p>Nothing needs action today.</p>
-          <p>Every active client has a Next Step and Due Date in the future.</p>
+          <p>No clients match this filter.</p>
         </div>
       ) : (
-        <div className="today-sections">
-          {populatedSections.map((key) => {
-            const rows = buckets[key];
-            const isExpanded = expanded[key];
-            const visible = isExpanded ? rows : rows.slice(0, PREVIEW_COUNT);
-            const overflow = rows.length - visible.length;
-            return (
-              <section
-                key={key}
-                ref={(el) => {
-                  sectionRefs.current[key] = el;
-                }}
-                className={`today-section today-section--${key}`}
-              >
-                <div className="today-section-row">
-                  <div className="today-section-heading">
-                    <span className="today-section-icon" aria-hidden="true">
-                      {CARD_ICONS[key]}
-                    </span>
-                    <h3 className="today-section-title">{SECTION_TITLES[key]}</h3>
-                    <span className="today-section-count">{rows.length}</span>
-                  </div>
-                  {!isExpanded && overflow > 0 && (
-                    <button
-                      type="button"
-                      className="today-section-viewall"
-                      onClick={() => expandSection(key)}
-                    >
-                      View all
-                    </button>
-                  )}
-                </div>
-
-                <div className="today-table-wrap">
-                  <table className="today-table">
-                    <thead>
-                      <tr>
-                        <th>Client</th>
-                        <th>Type</th>
-                        <th>Stage</th>
-                        <th>Category</th>
-                        <th>Assigned To</th>
-                        <th>Last Contact</th>
-                        <th>Next Step / Due Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visible.map((deal) => {
-                        const due = dueLabelFor(deal, key);
-                        return (
-                          <tr
-                            key={deal.id}
-                            className="today-table-row"
-                            onClick={() => onSelectDeal(deal.id)}
-                          >
-                            <td className="today-table-td--name">
-                              {deal.clientName}
-                            </td>
-                            <td>
-                              {deal.opportunityType ? (
-                                <span
-                                  className={`opp-type-pill opp-type-pill--${deal.opportunityType}`}
-                                >
-                                  {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]}
-                                </span>
-                              ) : (
-                                <span className="followup-muted">—</span>
-                              )}
-                            </td>
-                            <td>{STAGE_LABELS[deal.stage]}</td>
-                            <td>
-                              <span
-                                className={`category-badge category-badge--${deal.category}`}
-                              >
-                                {CATEGORY_LABELS[deal.category]}
-                              </span>
-                            </td>
-                            <td>{displayAssignee(deal.assignedTo, members)}</td>
-                            <td>{lastContactText(deal)}</td>
-                            <td className="today-table-td--nextstep">
-                              <div className="today-nextstep-text">
-                                {deal.nextStep?.trim() || '—'}
-                              </div>
-                              <div
-                                className={`today-due-label today-due-label--${due.tone}`}
-                              >
-                                {due.text}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {!isExpanded && overflow > 0 && (
-                  <button
-                    type="button"
-                    className="today-section-showmore"
-                    onClick={() => expandSection(key)}
+        <div className="today-list-wrap">
+          <table className="today-list">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Reason</th>
+                <th>Next Step / Due Date</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => {
+                const due = dueLabelFor(row, row.bucket);
+                return (
+                  <tr
+                    key={row.id}
+                    className="today-list-row"
+                    onClick={() => onSelectDeal(row.id)}
                   >
-                    + Show {overflow} more
-                  </button>
-                )}
-              </section>
-            );
-          })}
+                    <td className="today-list-td--name">{row.clientName}</td>
+                    <td>
+                      <span
+                        className={`today-action-badge today-action-badge--${row.bucket}`}
+                      >
+                        {REASON_LABELS[row.bucket]}
+                      </span>
+                    </td>
+                    <td className="today-list-td--nextstep">
+                      <div className="today-nextstep-text">
+                        {row.nextStep?.trim() || 'Missing Next Step'}
+                      </div>
+                      <div
+                        className={`today-due-label today-due-label--${due.tone}`}
+                      >
+                        {due.text}
+                      </div>
+                    </td>
+                    <td className="today-list-td--details">
+                      <div className="today-details-line">
+                        {row.opportunityType && (
+                          <span>{OPPORTUNITY_TYPE_LABELS[row.opportunityType]}</span>
+                        )}
+                        <span className="today-details-sep">·</span>
+                        <span>{STAGE_LABELS[row.stage]}</span>
+                        <span className="today-details-sep">·</span>
+                        <span className={`today-details-cat today-details-cat--${row.category}`}>
+                          {CATEGORY_LABELS[row.category]}
+                        </span>
+                      </div>
+                      <div className="today-details-line today-details-line--muted">
+                        <span>{displayAssignee(row.assignedTo, members)}</span>
+                        <span className="today-details-sep">·</span>
+                        <span>{lastContactText(row)}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
-
-      <aside className="today-info-banner" role="note">
-        <span className="today-info-icon" aria-hidden="true">ⓘ</span>
-        <span>
-          Clients are shown here based on <strong>Next Step</strong> and{' '}
-          <strong>Due Date</strong> only. Closed transactions are not included.
-        </span>
-      </aside>
     </div>
   );
 }
