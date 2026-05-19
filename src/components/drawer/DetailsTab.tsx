@@ -39,6 +39,10 @@ interface DetailsTabProps {
 export interface DetailsTabHandle {
   validate: () => boolean;
   getPatch: () => Partial<Deal>;
+  // Returns a snapshot of the Next Step that was active when the user
+  // checked Mark Done in this drawer session, or null if Mark Done was not
+  // checked. The drawer reads this on Save to write a touch entry.
+  consumeMarkDoneEvent: () => { priorNextStep: string } | null;
   markSaved: () => void;
   isDirty: () => boolean;
 }
@@ -133,6 +137,14 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
   // picks a new Due Date.
   const [markedDone, setMarkedDone] = useState(false);
 
+  // Snapshot of the Next Step that was active when Mark Done was checked.
+  // Set on toggle-on, cleared on toggle-off, on edits to Next Step / Due,
+  // and after a successful save. The drawer reads this via the imperative
+  // handle to log the completion as a real touch.
+  const [pendingCompletion, setPendingCompletion] = useState<{
+    priorNextStep: string;
+  } | null>(null);
+
   function handleChange<K extends keyof ReturnType<typeof initForm>>(
     field: K,
     value: ReturnType<typeof initForm>[K],
@@ -147,18 +159,20 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     }
     if (markedDone && (field === 'nextStep' || field === 'nextStepDue')) {
       setMarkedDone(false);
+      setPendingCompletion(null);
     }
   }
 
-  // Toggling Mark Done clears Next Step + Due Date when checked; unchecking
-  // leaves the cleared inputs alone (the user can simply type a new value
-  // or pick a date, which also auto-unchecks via handleChange).
+  // Toggling Mark Done clears Next Step + Due Date when checked AND captures
+  // the prior step text. Unchecking discards the captured snapshot.
   function handleMarkDoneToggle() {
     if (markedDone) {
       setMarkedDone(false);
+      setPendingCompletion(null);
       return;
     }
     userTouchedRef.current = true;
+    setPendingCompletion({ priorNextStep: form.nextStep.trim() });
     setForm((f) => ({ ...f, nextStep: '', nextStepDue: '' }));
     setMarkedDone(true);
   }
@@ -220,8 +234,14 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     () => ({
       validate,
       getPatch,
+      // pendingCompletion is non-null iff the user toggled Mark Done in this
+      // drawer session. Whether priorNextStep is empty doesn't matter — the
+      // toggle is the signal to log a completion.
+      consumeMarkDoneEvent: () => pendingCompletion,
       markSaved: () => {
         userTouchedRef.current = false;
+        setMarkedDone(false);
+        setPendingCompletion(null);
       },
       isDirty: () => userTouchedRef.current,
     }),

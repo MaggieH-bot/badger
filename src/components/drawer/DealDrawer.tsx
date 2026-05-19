@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Deal } from '../../types';
 import { OPPORTUNITY_TYPE_LABELS, STAGE_LABELS } from '../../constants/pipeline';
+import { useAuth } from '../../store/useAuth';
 import { useDeals } from '../../store/useDeals';
 import { useUIPreferences } from '../../store/useUIPreferences';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { displayAssignee } from '../../utils/assignee';
+import { generateId } from '../../utils/ids';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
@@ -52,6 +54,7 @@ function formatLastUpdated(iso: string): string {
 
 export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   const { deals, dispatch } = useDeals();
+  const { user } = useAuth();
   const { preferences } = useUIPreferences();
   const { members } = useWorkspaceMembers();
   const [activeSection, setActiveSection] = useState<SectionKey>('overview');
@@ -106,11 +109,30 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
 
     const detailsPatch = detailsRef.current?.getPatch() ?? {};
     const moreInfoPatch = activityRef.current?.getMoreInfoPatch() ?? {};
+    const markDone = detailsRef.current?.consumeMarkDoneEvent() ?? null;
 
     dispatch({
       type: 'UPDATE_DEAL',
       deal: { ...deal, ...detailsPatch, ...moreInfoPatch },
     });
+
+    // Mark Done counts as a completed touch. Reuses the existing
+    // ADD_CONTACT_LOG path, which bumps last_contact and clears
+    // Never-contacted / First-Touch surfaces for the record.
+    if (markDone) {
+      const trimmedPrior = markDone.priorNextStep.trim();
+      dispatch({
+        type: 'ADD_CONTACT_LOG',
+        dealId: deal.id,
+        entry: {
+          id: generateId(),
+          timestamp: new Date().toISOString(),
+          method: 'other',
+          author: user?.id ?? '',
+          note: trimmedPrior ? `Marked done: ${trimmedPrior}` : 'Marked done',
+        },
+      });
+    }
 
     detailsRef.current?.markSaved();
     activityRef.current?.markMoreInfoSaved();
