@@ -22,18 +22,19 @@ storage all live in the sandbox project for non-prod work.
 - [x] Create a new Supabase project named `badger-sandbox`.
   - Project ref: `eljekklabrxlzoisqxwq`
   - URL: `https://eljekklabrxlzoisqxwq.supabase.co`
-- [ ] In the sandbox SQL Editor, apply each migration once, **in date order**:
-  1. `sql/2026-04-26-stage-and-fields.sql`
-  2. `sql/2026-04-26-workspace-invites.sql`
-  3. `sql/2026-04-27-document-files.sql`
-  4. `sql/2026-04-27-workspace-member-emails.sql`
-  5. `sql/2026-04-28-relax-assignee-check.sql`
-  6. `sql/2026-05-11-system-next-step-done-method.sql`
+- [ ] In the sandbox SQL Editor, paste and run **one file**:
+  `sql/2026-04-25-base-schema.sql`
 
-  Skip `sql/2026-05-11-contact-log-system-method.sql` — that file targets a
-  non-existent table name (`public.contact_log` instead of
-  `public.contact_log_entries`) and is a no-op. It's retained in the repo
-  for history; the system-next-step-done migration above supersedes it.
+  That file creates every table, index, RLS policy, and the storage bucket
+  the app needs, in their current shape. It's a reconstruction of prod's
+  schema (the original prod tables were created via the Supabase dashboard
+  rather than versioned SQL). The four 2026-04-26 → 2026-04-28 files in this
+  folder are incremental migrations that document how prod was upgraded over
+  time; on a fresh sandbox they're idempotent no-ops and don't need to be
+  applied.
+
+  If the sandbox later drifts from prod, treat that as a real bug and patch
+  it through the migration runbook below — don't hand-edit the base schema.
 - [ ] Authentication → URL Configuration
   - Site URL: `https://badger-git-staging-maggieh-bots-projects.vercel.app`
   - Redirect URLs (add each):
