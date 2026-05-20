@@ -357,11 +357,14 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
 
         {showInsight && (
           <div className="record-badger-callout">
-            <div className="record-badger-callout-head">
-              <BadgerAvatar size={20} />
-              <span className="record-badger-callout-name">Badger</span>
+            <BadgerAvatar
+              size={26}
+              className="record-badger-callout-mark"
+              title="Badger"
+            />
+            <div className="record-badger-callout-body">
+              <InsightPanel insight={insight} variant="full" />
             </div>
-            <InsightPanel insight={insight} variant="full" />
           </div>
         )}
 

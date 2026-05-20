@@ -2943,23 +2943,23 @@ body {
 
 /* --- Insight panel --- */
 
-/* Spacing for the in-record Badger callout (sits above the Next Step block). */
+/* In-record Badger callout: the face sits to the left like it's delivering
+   the line — no name label, the mark carries the identity. */
 .record-badger-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   margin: 4px 0 16px;
 }
 
-.record-badger-callout-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+.record-badger-callout-mark {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
-.record-badger-callout-name {
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  color: var(--text-primary);
+.record-badger-callout-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .insight-panel {
