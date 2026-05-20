@@ -2943,6 +2943,11 @@ body {
 
 /* --- Insight panel --- */
 
+/* Spacing for the in-record Badger callout (sits above the Next Step block). */
+.record-badger-callout {
+  margin: 4px 0 16px;
+}
+
 .insight-panel {
   display: block;
   width: 100%;

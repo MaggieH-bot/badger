@@ -26,6 +26,9 @@ import {
   shouldShowBuyerPriceRange,
   shouldShowClosedPrice,
 } from '../deals/fieldVisibility';
+import { computeUrgency } from '../../utils/urgency';
+import { computeInsight } from '../../utils/insights';
+import { InsightPanel } from '../intelligence/InsightPanel';
 
 interface DetailsTabProps {
   deal: Deal;
@@ -254,6 +257,13 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     // closure is what the footer should call.
   );
 
+  // Deterministic Badger insight for this deal, computed from the persisted
+  // record (not the in-progress form). Shown near Next Step only when it's
+  // worth surfacing — high/medium priority. Low (on-track, watch, closed)
+  // renders nothing so the callout stays meaningful, not noisy.
+  const insight = computeInsight(computeUrgency(deal));
+  const showInsight = insight.priority !== 'low';
+
   return (
     <form
       className="deal-form"
@@ -343,6 +353,12 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             </select>
           </div>
         </div>
+
+        {showInsight && (
+          <div className="record-badger-callout">
+            <InsightPanel insight={insight} variant="full" />
+          </div>
+        )}
 
         <div id="anchor-next-step" className="next-step-block">
           <div className="form-row form-row--next-step">
