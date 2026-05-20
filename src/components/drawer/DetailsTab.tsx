@@ -274,6 +274,18 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
         onRequestSave();
       }}
     >
+      {/* Badger's headline read on this client — first thing in the record. */}
+      <div className="record-badger-callout">
+        <BadgerAvatar
+          size={26}
+          className="record-badger-callout-mark"
+          title="Badger"
+        />
+        <div className="record-badger-callout-body">
+          <InsightPanel insight={insight} variant="full" hidePriority />
+        </div>
+      </div>
+
       <section id="section-overview" className="record-section">
         <h3 className="record-section-title">Overview</h3>
 
@@ -350,17 +362,6 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
                 </option>
               ))}
             </select>
-          </div>
-        </div>
-
-        <div className="record-badger-callout">
-          <BadgerAvatar
-            size={26}
-            className="record-badger-callout-mark"
-            title="Badger"
-          />
-          <div className="record-badger-callout-body">
-            <InsightPanel insight={insight} variant="full" hidePriority />
           </div>
         </div>
 
