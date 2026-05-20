@@ -360,7 +360,7 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             title="Badger"
           />
           <div className="record-badger-callout-body">
-            <InsightPanel insight={insight} variant="full" />
+            <InsightPanel insight={insight} variant="full" hidePriority />
           </div>
         </div>
 
