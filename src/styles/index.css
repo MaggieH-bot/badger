@@ -2948,6 +2948,20 @@ body {
   margin: 4px 0 16px;
 }
 
+.record-badger-callout-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.record-badger-callout-name {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
 .insight-panel {
   display: block;
   width: 100%;

@@ -29,6 +29,7 @@ import {
 import { computeUrgency } from '../../utils/urgency';
 import { computeInsight } from '../../utils/insights';
 import { InsightPanel } from '../intelligence/InsightPanel';
+import { BadgerAvatar } from '../BadgerAvatar';
 
 interface DetailsTabProps {
   deal: Deal;
@@ -356,6 +357,10 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
 
         {showInsight && (
           <div className="record-badger-callout">
+            <div className="record-badger-callout-head">
+              <BadgerAvatar size={20} />
+              <span className="record-badger-callout-name">Badger</span>
+            </div>
             <InsightPanel insight={insight} variant="full" />
           </div>
         )}
