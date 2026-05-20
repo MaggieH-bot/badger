@@ -34,30 +34,30 @@ function areaPhrase(d: Deal): string {
 function valueAddByType(d: Deal): string {
   switch (d.opportunityType) {
     case 'buy':
-      return `Share a short inventory update for ${areaPhrase(d)}.`;
+      return `Drop a quick inventory snapshot for ${areaPhrase(d)}.`;
     case 'sell':
-      return `Send recent comparable sales in ${areaPhrase(d)}.`;
+      return `Send fresh comps for ${areaPhrase(d)}.`;
     case 'rent':
-      return `Share a rental market summary for ${areaPhrase(d)}.`;
+      return `Share a rental market read for ${areaPhrase(d)}.`;
     case 'both':
-      return `Send market activity in ${areaPhrase(d)}.`;
+      return `Send what's actually moving in ${areaPhrase(d)}.`;
     default:
-      return `Share a relevant market update for ${areaPhrase(d)}.`;
+      return `Share a market read worth their time for ${areaPhrase(d)}.`;
   }
 }
 
 function touchByType(d: Deal): string {
   switch (d.opportunityType) {
     case 'buy':
-      return 'Reach out with current listings or offer a tour plan.';
+      return 'Send a few current listings or pitch a tour window.';
     case 'sell':
-      return 'Check in on listing prep, staging, or pricing.';
+      return 'Check in on prep, staging, or where the price should land.';
     case 'rent':
-      return 'Send fresh rental options.';
+      return 'Send a fresh batch of rental options.';
     case 'both':
-      return 'Reach out about both buy- and sell-side activity.';
+      return "Check both sides — what's selling and what they're hunting for.";
     default:
-      return 'Reach out with a relevant update.';
+      return 'Reach out with something they can actually use.';
   }
 }
 
@@ -161,8 +161,8 @@ function contextNoteOf(d: Deal, exclude: ContextSource[] = []): string | undefin
 
 const CLOSED_INSIGHT: BadgerInsight = {
   priority: 'low',
-  reason: 'Client closed.',
-  suggestedTouch: '',
+  reason: "Closed. Nice work — nothing to chase here.",
+  suggestedTouch: 'Maybe line up a future check-in so the referral stays warm.',
   suggestedValueAdd: '',
 };
 
@@ -174,8 +174,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.neverContacted) {
     return {
       priority: 'high',
-      reason: 'No contact has been logged for this client yet.',
-      suggestedTouch: 'Reach out and log your first touch.',
+      reason: 'New name, zero history. Not one logged touch on this client yet.',
+      suggestedTouch: 'Make first contact and log it, before they forget they reached out.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
@@ -192,11 +192,11 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (hasBlocker(d)) {
       return {
         priority: 'high',
-        reason: pricedReason(d, `Under Contract — blocked: ${d.blocker!.trim()}`),
+        reason: pricedReason(d, `This one breaks if you blink. Under contract with an open blocker: ${d.blocker!.trim()}.`),
         suggestedTouch:
-          'Resolve the blocker with the client today — the close depends on it.',
+          'Get a straight answer on the blocker now, with an owner and a date attached.',
         suggestedValueAdd:
-          'Send a closing checklist with the open item highlighted.',
+          'Send a closing checklist with that open item flagged.',
         contextNote: contextNoteOf(d),
       };
     }
@@ -207,10 +207,10 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
         priority: 'high',
         reason: pricedReason(
           d,
-          `Under Contract — overdue: "${d.nextStep ?? 'next step'}" was due ${formatDueDate(d.nextStepDue!)}.`,
+          `The clock's running and this slipped. Under contract, and "${d.nextStep ?? 'the next step'}" was due ${formatDueDate(d.nextStepDue!)}.`,
         ),
-        suggestedTouch: 'Catch up the overdue step today.',
-        suggestedValueAdd: 'Send a closing/escrow checklist.',
+        suggestedTouch: 'Close out that step before the contract timeline bites.',
+        suggestedValueAdd: 'Send an escrow checklist so nothing else slips.',
         contextNote: contextNoteOf(d),
       };
     }
@@ -219,10 +219,10 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (!hasNextStep(d)) {
       return {
         priority: 'high',
-        reason: pricedReason(d, 'Under Contract — no next step defined.'),
+        reason: pricedReason(d, "Under contract with nothing on the board. That's how clean deals go sideways."),
         suggestedTouch:
-          'Set the next concrete step today. Contracts can break without active management.',
-        suggestedValueAdd: 'Send a closing/escrow checklist.',
+          'Set the next concrete step now — contracts do not manage themselves.',
+        suggestedValueAdd: 'Send an escrow checklist to anchor the next steps.',
         contextNote: contextNoteOf(d),
       };
     }
@@ -233,10 +233,10 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
         priority: 'high',
         reason: pricedReason(
           d,
-          `Under Contract — last touch was ${daysPhrase(d.daysSinceContact)} ago.`,
+          `Under contract and quiet for ${daysPhrase(d.daysSinceContact)}. Silence is risk this close to the finish.`,
         ),
-        suggestedTouch: 'Confirm timeline and outstanding items today.',
-        suggestedValueAdd: 'Send a closing/escrow checklist.',
+        suggestedTouch: 'Check the timeline and open items while there is still runway.',
+        suggestedValueAdd: 'Send an escrow checklist so nothing gets missed.',
         contextNote: contextNoteOf(d),
       };
     }
@@ -244,7 +244,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     // 3e. On track Under Contract — surface as medium so it stays on Today.
     return {
       priority: 'medium',
-      reason: pricedReason(d, 'Under Contract — protect the timeline.'),
+      reason: pricedReason(d, 'Under contract and on track. Keep it that way.'),
       suggestedTouch: smartTouch(d),
       suggestedValueAdd:
         'Confirm contingencies, inspection dates, and lender deadlines.',
@@ -260,9 +260,9 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (hasBlocker(d)) {
       return {
         priority: 'high',
-        reason: pricedReason(d, `Listing blocked: ${d.blocker!.trim()}`),
-        suggestedTouch: 'Tackle the blocker so the listing keeps moving.',
-        suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
+        reason: pricedReason(d, `The listing's snagged on something: ${d.blocker!.trim()}. Snagged listings quietly stop getting your attention.`),
+        suggestedTouch: 'Clear what is jamming it — price, prep, or access — and keep it moving.',
+        suggestedValueAdd: `Send fresh comps for ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
       };
     }
@@ -271,28 +271,28 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
         priority: 'high',
         reason: pricedReason(
           d,
-          `Listing hasn't had a touch in ${daysPhrase(d.daysSinceContact)}.`,
+          `Your seller's been in the dark for ${daysPhrase(d.daysSinceContact)}. That's how listings lose faith in you.`,
         ),
         suggestedTouch:
-          'Send showing feedback, market activity, and a recommendation.',
-        suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
+          'Send showing feedback, what the market is doing, and your read.',
+        suggestedValueAdd: `Send fresh comps for ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
       };
     }
     if (!hasNextStep(d)) {
       return {
         priority: 'medium',
-        reason: pricedReason(d, 'Listing has no defined next step.'),
-        suggestedTouch: 'Set a recurring update cadence (weekly market touch).',
-        suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
+        reason: pricedReason(d, 'Active listing, no plan on the board.'),
+        suggestedTouch: 'Lock a weekly update rhythm so the seller always knows where things stand.',
+        suggestedValueAdd: `Send fresh comps for ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
       };
     }
     return {
       priority: 'medium',
-      reason: pricedReason(d, 'Listing — keep regular updates flowing.'),
+      reason: pricedReason(d, 'Listing is moving. Keep the updates flowing.'),
       suggestedTouch: smartTouch(d),
-      suggestedValueAdd: `Send recent comparable sales in ${areaPhrase(d)}.`,
+      suggestedValueAdd: `Send fresh comps for ${areaPhrase(d)}.`,
       contextNote: contextNoteOf(d),
     };
   }
@@ -305,35 +305,35 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (hasBlocker(d)) {
       return {
         priority: 'high',
-        reason: `Active buyer blocked: ${d.blocker!.trim()}`,
-        suggestedTouch: 'Tackle the blocker — buyer momentum stalls fast.',
-        suggestedValueAdd: 'Re-confirm budget and must-haves before momentum stalls.',
+        reason: `Buyer's stuck on something: ${d.blocker!.trim()}. Buyer momentum dies fast once it stalls.`,
+        suggestedTouch: 'Clear the blocker before they cool off or drift to another agent.',
+        suggestedValueAdd: 'Re-confirm budget and must-haves while they are engaged.',
         contextNote: contextNoteOf(d),
       };
     }
     if (d.followUpStatus === 'needs_attention') {
       return {
         priority: 'high',
-        reason: `Active buyer cooled off — ${daysPhrase(d.daysSinceContact)} since last contact.`,
-        suggestedTouch: `Send 2–3 fresh listings in ${areaPhrase(d)} and offer a tour window this week.`,
+        reason: `Your buyer's gone cold — ${daysPhrase(d.daysSinceContact)} since the last contact.`,
+        suggestedTouch: `Send 2–3 fresh listings in ${areaPhrase(d)} and offer a tour window.`,
         suggestedValueAdd:
-          'Re-confirm budget and must-haves before momentum stalls.',
+          'Re-confirm budget and must-haves before the search loses steam.',
         contextNote: contextNoteOf(d),
       };
     }
     if (!hasNextStep(d)) {
       return {
         priority: 'medium',
-        reason: 'Active buyer has no defined next step.',
+        reason: 'Active buyer, no next step — momentum with nowhere to go.',
         suggestedTouch:
-          'Plan the next showing window or share a curated list.',
+          'Plan a showing window or send a curated short list.',
         suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
       };
     }
     return {
       priority: 'medium',
-      reason: 'Active buyer — keep momentum.',
+      reason: 'Buyer is engaged — keep the momentum.',
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
@@ -348,9 +348,9 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (d.opportunityType === 'buy' || d.opportunityType === 'rent') {
       return {
         priority: 'medium',
-        reason: 'New buyer lead — activate them while interest is fresh.',
+        reason: 'Fresh buyer lead — strike while they are still excited.',
         suggestedTouch:
-          'Schedule a discovery call: budget, timeline, must-haves.',
+          'Book a discovery call: budget, timeline, must-haves.',
         suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
       };
@@ -358,8 +358,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (d.opportunityType === 'sell' || d.opportunityType === 'both') {
       return {
         priority: 'medium',
-        reason: 'New seller lead — start prelisting prep.',
-        suggestedTouch: 'Schedule a walkthrough and pricing conversation.',
+        reason: 'Fresh seller lead — get the prelisting motion started.',
+        suggestedTouch: 'Book a walkthrough and a real pricing conversation.',
         suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
         contextNote: contextNoteOf(d),
       };
@@ -367,8 +367,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     // Type unset — generic lead nudge
     return {
       priority: 'medium',
-      reason: 'New lead — confirm Buy / Sell / Both intent.',
-      suggestedTouch: 'Discovery call to establish intent and timeline.',
+      reason: 'New lead, intent unknown — figure out if they are buying, selling, or both.',
+      suggestedTouch: 'Quick discovery call to nail down intent and timeline.',
       suggestedValueAdd: 'Light market overview based on their stated area.',
       contextNote: contextNoteOf(d),
     };
@@ -382,8 +382,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'hot' && hasBlocker(d)) {
     return {
       priority: 'high',
-      reason: `Hot client blocked: ${d.blocker!.trim()}`,
-      suggestedTouch: 'Tackle the blocker with the client directly.',
+      reason: `Hot client jammed up: ${d.blocker!.trim()}. Hot plus blocked is a deal you can lose.`,
+      suggestedTouch: 'Get on it with the client directly before this one cools.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
@@ -393,8 +393,8 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (hasNextStep(d) && isOverdue(d.nextStepDue)) {
     return {
       priority: d.category === 'watch' ? 'medium' : 'high',
-      reason: `Overdue: "${d.nextStep!.trim()}" was due ${formatDueDate(d.nextStepDue!)}.`,
-      suggestedTouch: 'Catch up the overdue step today.',
+      reason: `Past due. "${d.nextStep!.trim()}" was due ${formatDueDate(d.nextStepDue!)} and it's still open.`,
+      suggestedTouch: 'Knock it out or reschedule it for a date you will actually keep.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
@@ -407,12 +407,12 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     const confSuffix = conf ? ` (${conf})` : '';
     const reason =
       d.followUpStatus === 'needs_attention'
-        ? `Hot ${role}${confSuffix} hasn't been contacted in ${daysPhrase(d.daysSinceContact)} and has no defined next step.`
-        : `Hot ${role}${confSuffix} has no defined next step.`;
+        ? `Hot ${role}${confSuffix} with no next step, and ${daysPhrase(d.daysSinceContact)} of silence. That's a lead going to waste.`
+        : `Hot ${role}${confSuffix} and not a single next step on the board.`;
     return {
       priority: 'high',
       reason,
-      suggestedTouch: 'Set one concrete next step today, then reach out.',
+      suggestedTouch: 'Decide the one move that gets this going, then make it.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
@@ -424,7 +424,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     const confSuffix = conf ? ` (${conf})` : '';
     return {
       priority: 'high',
-      reason: `Hot ${roleNoun(d.opportunityType)}${confSuffix} needs follow-up — last contact ${daysPhrase(d.daysSinceContact)} ago.`,
+      reason: `Hot ${roleNoun(d.opportunityType)}${confSuffix} cooling off — ${daysPhrase(d.daysSinceContact)} since you last connected.`,
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
@@ -436,12 +436,12 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     const role = roleNoun(d.opportunityType);
     const reason =
       d.followUpStatus === 'needs_attention'
-        ? `Nurture ${role} going cold and has no defined next step.`
-        : `Nurture ${role} has no defined next step.`;
+        ? `Nurture ${role} slipping cold with nothing planned to pull them back.`
+        : `Nurture ${role} with no next step set.`;
     return {
       priority: 'medium',
       reason,
-      suggestedTouch: 'Set one concrete next step for your next check-in.',
+      suggestedTouch: 'Pin a concrete step for your next check-in.',
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
@@ -451,7 +451,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'nurture' && d.followUpStatus === 'needs_attention') {
     return {
       priority: 'medium',
-      reason: `Nurture ${roleNoun(d.opportunityType)} going cold — last contact ${daysPhrase(d.daysSinceContact)} ago.`,
+      reason: `Nurture ${roleNoun(d.opportunityType)} cooling — ${daysPhrase(d.daysSinceContact)} since the last touch.`,
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
@@ -464,7 +464,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     const confClause = conf ? ` at ${conf} confidence` : '';
     return {
       priority: 'medium',
-      reason: `Hot ${roleNoun(d.opportunityType)}${confClause} — keep momentum.`,
+      reason: `Hot ${roleNoun(d.opportunityType)}${confClause} and on track — keep the heat on.`,
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
@@ -475,7 +475,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'nurture' && d.targetTimeframe?.trim()) {
     return {
       priority: 'medium',
-      reason: `Nurture ${roleNoun(d.opportunityType)} targeting ${d.targetTimeframe.trim()} — keep them warm.`,
+      reason: `Nurture ${roleNoun(d.opportunityType)} eyeing ${d.targetTimeframe.trim()} — keep them warm so you're the call they make.`,
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d, ['timeframe']),
@@ -486,9 +486,9 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'watch' && !hasNextStep(d)) {
     return {
       priority: 'low',
-      reason: 'Long-term contact has no defined next step.',
-      suggestedTouch: 'Set a future check-in plan.',
-      suggestedValueAdd: 'Send a light market update when appropriate.',
+      reason: 'Long-game contact with no plan to check back in.',
+      suggestedTouch: 'Set a future check-in so they do not fall off the radar.',
+      suggestedValueAdd: 'Send a light market update when something is worth it.',
       contextNote: contextNoteOf(d),
     };
   }
@@ -496,10 +496,10 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'watch') {
     return {
       priority: 'low',
-      reason: 'Long-term contact — plan is set.',
+      reason: "Long-game contact — plan's set, nothing urgent.",
       suggestedTouch: smartTouch(d),
       suggestedValueAdd:
-        'Light touch only — share when something genuinely useful comes up.',
+        'Light touch only — reach out when something genuinely useful comes up.',
       contextNote: contextNoteOf(d),
     };
   }
@@ -507,7 +507,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   // Fallback (Nurture on track, has next step, no timeframe).
   return {
     priority: 'low',
-    reason: `${CATEGORY_LABELS[d.category]} ${roleNoun(d.opportunityType)} on track.`,
+    reason: `${CATEGORY_LABELS[d.category]} ${roleNoun(d.opportunityType)} — on track, no fires.`,
     suggestedTouch: smartTouch(d),
     suggestedValueAdd: valueAddByType(d),
     contextNote: contextNoteOf(d),
@@ -541,4 +541,4 @@ export function sortByInsightPriority(items: DealWithInsight[]): DealWithInsight
 void STAGE_LABELS;
 
 export const CALM_BRIEFING_MESSAGE =
-  'All active clients are on track. Use this window to deepen a Nurture or Watch relationship.';
+  "Everything's on track — rare and a little suspicious. Use the quiet to deepen a Nurture or Watch relationship.";
