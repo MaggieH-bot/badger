@@ -26,10 +26,6 @@ import {
   shouldShowBuyerPriceRange,
   shouldShowClosedPrice,
 } from '../deals/fieldVisibility';
-import { computeUrgency } from '../../utils/urgency';
-import { computeInsight } from '../../utils/insights';
-import { InsightPanel } from '../intelligence/InsightPanel';
-import { BadgerAvatar } from '../BadgerAvatar';
 
 interface DetailsTabProps {
   deal: Deal;
@@ -258,11 +254,6 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     // closure is what the footer should call.
   );
 
-  // Deterministic Badger insight for this deal, computed from the persisted
-  // record (not the in-progress form). Shown on every deal: high/medium get
-  // a push, low/on-track get cheerleader good-vibes — Badger's always there.
-  const insight = computeInsight(computeUrgency(deal));
-
   return (
     <form
       className="deal-form"
@@ -274,18 +265,6 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
         onRequestSave();
       }}
     >
-      {/* Badger's headline read on this client — first thing in the record. */}
-      <div className="record-badger-callout">
-        <BadgerAvatar
-          size={26}
-          className="record-badger-callout-mark"
-          title="Badger"
-        />
-        <div className="record-badger-callout-body">
-          <InsightPanel insight={insight} variant="full" hidePriority />
-        </div>
-      </div>
-
       <section id="section-overview" className="record-section">
         <h3 className="record-section-title">Overview</h3>
 

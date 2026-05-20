@@ -7,6 +7,10 @@ import { useUIPreferences } from '../../store/useUIPreferences';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { displayAssignee } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
+import { computeUrgency } from '../../utils/urgency';
+import { computeInsight } from '../../utils/insights';
+import { InsightPanel } from '../intelligence/InsightPanel';
+import { BadgerAvatar } from '../BadgerAvatar';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
@@ -224,6 +228,10 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   if (!isClosed) subtitleParts.push(STAGE_LABELS[deal.stage]);
   if (assigneeLabel) subtitleParts.push(`Assigned to ${assigneeLabel}`);
 
+  // Deterministic Badger insight, computed from the persisted deal. Rendered
+  // as a top-of-record banner below the header so it frames the whole record.
+  const insight = computeInsight(computeUrgency(deal));
+
   return (
     <div className="workspace-overlay">
       <div className="workspace-modal" ref={modalRef}>
@@ -248,6 +256,19 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
             &times;
           </button>
         </header>
+
+        <div
+          className={`workspace-badger-banner workspace-badger-banner--${insight.priority}`}
+        >
+          <BadgerAvatar
+            size={26}
+            className="workspace-badger-banner-mark"
+            title="Badger"
+          />
+          <div className="workspace-badger-banner-body">
+            <InsightPanel insight={insight} variant="full" hidePriority />
+          </div>
+        </div>
 
         <div className="workspace-body">
           <nav className="workspace-nav" aria-label="Client record sections">

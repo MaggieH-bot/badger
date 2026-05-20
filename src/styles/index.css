@@ -2943,23 +2943,51 @@ body {
 
 /* --- Insight panel --- */
 
-/* In-record Badger callout: the face sits to the left like it's delivering
-   the line — no name label, the mark carries the identity. */
-.record-badger-callout {
+/* Top-of-record Badger banner: a fixed full-width band under the header,
+   above the nav + content, so Badger frames the whole record. The face sits
+   to the left like it's delivering the line; the left accent + tint signal
+   priority (calm for on-track, warm for urgent). */
+.workspace-badger-banner {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin: 4px 0 16px;
+  padding: 12px var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--text-muted);
+  background: var(--bg-surface);
 }
 
-.record-badger-callout-mark {
+.workspace-badger-banner--high {
+  border-left-color: var(--alert);
+  background: var(--alert-bg);
+}
+
+.workspace-badger-banner--medium {
+  border-left-color: var(--accent);
+}
+
+.workspace-badger-banner--low {
+  border-left-color: var(--success);
+}
+
+.workspace-badger-banner-mark {
   flex-shrink: 0;
   margin-top: 2px;
 }
 
-.record-badger-callout-body {
+.workspace-badger-banner-body {
   flex: 1;
   min-width: 0;
+}
+
+/* Flatten the InsightPanel inside the banner — the banner is the container,
+   so the panel drops its own box (border / background / padding). */
+.workspace-badger-banner-body .insight-panel {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .insight-panel {
