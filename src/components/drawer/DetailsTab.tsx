@@ -259,11 +259,9 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
   );
 
   // Deterministic Badger insight for this deal, computed from the persisted
-  // record (not the in-progress form). Shown near Next Step only when it's
-  // worth surfacing — high/medium priority. Low (on-track, watch, closed)
-  // renders nothing so the callout stays meaningful, not noisy.
+  // record (not the in-progress form). Shown on every deal: high/medium get
+  // a push, low/on-track get cheerleader good-vibes — Badger's always there.
   const insight = computeInsight(computeUrgency(deal));
-  const showInsight = insight.priority !== 'low';
 
   return (
     <form
@@ -355,18 +353,16 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
           </div>
         </div>
 
-        {showInsight && (
-          <div className="record-badger-callout">
-            <BadgerAvatar
-              size={26}
-              className="record-badger-callout-mark"
-              title="Badger"
-            />
-            <div className="record-badger-callout-body">
-              <InsightPanel insight={insight} variant="full" />
-            </div>
+        <div className="record-badger-callout">
+          <BadgerAvatar
+            size={26}
+            className="record-badger-callout-mark"
+            title="Badger"
+          />
+          <div className="record-badger-callout-body">
+            <InsightPanel insight={insight} variant="full" />
           </div>
-        )}
+        </div>
 
         <div id="anchor-next-step" className="next-step-block">
           <div className="form-row form-row--next-step">
