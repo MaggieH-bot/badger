@@ -172,7 +172,12 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
       return;
     }
     userTouchedRef.current = true;
-    setPendingCompletion({ priorNextStep: form.nextStep.trim() });
+    // Capture the Next Step being completed. Prefer the live field value; if
+    // it's empty, fall back to the deal's persisted next step (still present
+    // until this save commits) so the snapshot survives a form-state desync.
+    const priorNextStep =
+      form.nextStep.trim() || (deal.nextStep ?? '').trim();
+    setPendingCompletion({ priorNextStep });
     setForm((f) => ({ ...f, nextStep: '', nextStepDue: '' }));
     setMarkedDone(true);
   }
