@@ -260,7 +260,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (hasBlocker(d)) {
       return {
         priority: 'high',
-        reason: pricedReason(d, `The listing's snagged on something: ${d.blocker!.trim()}. Snagged listings quietly stop getting your attention.`),
+        reason: pricedReason(d, `The listing's snagged on ${d.blocker!.trim()}. Stuck listings quietly stop getting attention.`),
         suggestedTouch: 'Clear what is jamming it — price, prep, or access — and keep it moving.',
         suggestedValueAdd: `Send fresh comps for ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
@@ -271,7 +271,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
         priority: 'high',
         reason: pricedReason(
           d,
-          `Your seller's been in the dark for ${daysPhrase(d.daysSinceContact)}. That's how listings lose faith in you.`,
+          `Your seller's been in the dark for ${daysPhrase(d.daysSinceContact)}. That's how sellers start shopping for another agent.`,
         ),
         suggestedTouch:
           'Send showing feedback, what the market is doing, and your read.',
@@ -305,7 +305,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     if (hasBlocker(d)) {
       return {
         priority: 'high',
-        reason: `Buyer's stuck on something: ${d.blocker!.trim()}. Buyer momentum dies fast once it stalls.`,
+        reason: `Buyer's stuck on ${d.blocker!.trim()}. Momentum dies fast once it stalls.`,
         suggestedTouch: 'Clear the blocker before they cool off or drift to another agent.',
         suggestedValueAdd: 'Re-confirm budget and must-haves while they are engaged.',
         contextNote: contextNoteOf(d),
@@ -394,7 +394,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
     return {
       priority: d.category === 'watch' ? 'medium' : 'high',
       reason: `Past due. "${d.nextStep!.trim()}" was due ${formatDueDate(d.nextStepDue!)} and it's still open.`,
-      suggestedTouch: 'Knock it out or reschedule it for a date you will actually keep.',
+      suggestedTouch: "Knock it out, or move it to a deadline that'll stick.",
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
     };
@@ -451,7 +451,7 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   if (d.category === 'nurture' && d.followUpStatus === 'needs_attention') {
     return {
       priority: 'medium',
-      reason: `Nurture ${roleNoun(d.opportunityType)} cooling — ${daysPhrase(d.daysSinceContact)} since the last touch.`,
+      reason: `Nurture ${roleNoun(d.opportunityType)} going quiet — ${daysPhrase(d.daysSinceContact)} since the last touch.`,
       suggestedTouch: smartTouch(d),
       suggestedValueAdd: valueAddByType(d),
       contextNote: contextNoteOf(d),
