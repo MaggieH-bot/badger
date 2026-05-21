@@ -3021,9 +3021,9 @@ body {
 }
 
 .badger-card-move {
-  margin: 6px 0 0;
-  font-size: 14px;
-  font-weight: 600;
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
   line-height: 1.4;
   color: var(--text-primary);
 }
@@ -3034,9 +3034,14 @@ body {
 }
 
 .badger-card-valueadd {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.badger-card-valueadd-mark {
+  color: #b56b05;
+  font-weight: 700;
 }
 
 .badger-card-context {

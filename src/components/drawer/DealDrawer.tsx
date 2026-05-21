@@ -273,7 +273,10 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
               </p>
             )}
             {insight.suggestedValueAdd && (
-              <p className="badger-card-valueadd">✦ {insight.suggestedValueAdd}</p>
+              <p className="badger-card-valueadd">
+                <span className="badger-card-valueadd-mark">✦</span>{' '}
+                {insight.suggestedValueAdd}
+              </p>
             )}
             {insight.contextNote && (
               <p className="badger-card-context">{insight.contextNote}</p>
