@@ -2943,51 +2943,107 @@ body {
 
 /* --- Insight panel --- */
 
-/* Top-of-record Badger banner: a fixed full-width band under the header,
-   above the nav + content, so Badger frames the whole record. The face sits
-   to the left like it's delivering the line; the left accent + tint signal
-   priority (calm for on-track, warm for urgent). */
-.workspace-badger-banner {
+/* Badger Briefing Card — one consistent branded treatment (no priority
+   colors). A contained card under the header that frames the record: calm
+   blue-gray base, amber accent for identity (avatar badge, eyebrow, arrow).
+   Brand colors: #59757a blue-gray, #b56b05 accent. */
+.badger-card {
   flex-shrink: 0;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px var(--space-lg);
-  border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--text-muted);
-  background: var(--bg-surface);
+  gap: 12px;
+  margin: 14px var(--space-lg);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(89, 117, 122, 0.14);
+  border: 1px solid rgba(89, 117, 122, 0.3);
+  border-left: 3px solid #b56b05;
 }
 
-.workspace-badger-banner--high {
-  border-left-color: var(--alert);
-  background: var(--alert-bg);
+/* Subtle one-time entrance when the record opens. Only when motion is OK. */
+@media (prefers-reduced-motion: no-preference) {
+  .badger-card {
+    animation: badger-card-in 240ms ease-out both;
+  }
 }
 
-.workspace-badger-banner--medium {
-  border-left-color: var(--accent);
+@keyframes badger-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.workspace-badger-banner--low {
-  border-left-color: var(--success);
-}
-
-.workspace-badger-banner-mark {
+.badger-card-avatar {
   flex-shrink: 0;
-  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #b56b05;
 }
 
-.workspace-badger-banner-body {
+.badger-card-body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-/* Flatten the InsightPanel inside the banner — the banner is the container,
-   so the panel drops its own box (border / background / padding). */
-.workspace-badger-banner-body .insight-panel {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0;
+.badger-card-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b56b05;
+}
+
+.badger-card-headline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.badger-card-reason {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.badger-card-move {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.badger-card-move-arrow {
+  color: #b56b05;
+  font-weight: 700;
+}
+
+.badger-card-valueadd {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.badger-card-context {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 .insight-panel {

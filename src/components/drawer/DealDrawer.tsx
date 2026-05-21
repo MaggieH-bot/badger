@@ -9,7 +9,6 @@ import { displayAssignee } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
 import { computeUrgency } from '../../utils/urgency';
 import { computeInsight } from '../../utils/insights';
-import { InsightPanel } from '../intelligence/InsightPanel';
 import { BadgerAvatar } from '../BadgerAvatar';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
@@ -257,16 +256,28 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
           </button>
         </header>
 
-        <div
-          className={`workspace-badger-banner workspace-badger-banner--${insight.priority}`}
-        >
-          <BadgerAvatar
-            size={26}
-            className="workspace-badger-banner-mark"
-            title="Badger"
-          />
-          <div className="workspace-badger-banner-body">
-            <InsightPanel insight={insight} variant="full" hidePriority />
+        <div className="badger-card">
+          <span className="badger-card-avatar">
+            <BadgerAvatar size={22} title="Badger" />
+          </span>
+          <div className="badger-card-body">
+            <span className="badger-card-eyebrow">Badger</span>
+            <p className="badger-card-headline">{insight.headline}</p>
+            {insight.reason && (
+              <p className="badger-card-reason">{insight.reason}</p>
+            )}
+            {insight.suggestedTouch && (
+              <p className="badger-card-move">
+                <span className="badger-card-move-arrow">→</span>{' '}
+                {insight.suggestedTouch}
+              </p>
+            )}
+            {insight.suggestedValueAdd && (
+              <p className="badger-card-valueadd">✦ {insight.suggestedValueAdd}</p>
+            )}
+            {insight.contextNote && (
+              <p className="badger-card-context">{insight.contextNote}</p>
+            )}
           </div>
         </div>
 
