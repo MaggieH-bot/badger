@@ -7,6 +7,9 @@ import { useUIPreferences } from '../../store/useUIPreferences';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { displayAssignee } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
+import { computeUrgency } from '../../utils/urgency';
+import { computeInsight } from '../../utils/insights';
+import { BadgerAvatar } from '../BadgerAvatar';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
@@ -224,6 +227,10 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   if (!isClosed) subtitleParts.push(STAGE_LABELS[deal.stage]);
   if (assigneeLabel) subtitleParts.push(`Assigned to ${assigneeLabel}`);
 
+  // Deterministic Badger insight, computed from the persisted deal. Rendered
+  // as a top-of-record banner below the header so it frames the whole record.
+  const insight = computeInsight(computeUrgency(deal));
+
   return (
     <div className="workspace-overlay">
       <div className="workspace-modal" ref={modalRef}>
@@ -248,6 +255,34 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
             &times;
           </button>
         </header>
+
+        <div className="badger-card">
+          <span className="badger-card-avatar">
+            <BadgerAvatar size={22} title="Badger" />
+          </span>
+          <div className="badger-card-body">
+            <span className="badger-card-eyebrow">Badger</span>
+            <p className="badger-card-headline">{insight.headline}</p>
+            {insight.reason && (
+              <p className="badger-card-reason">{insight.reason}</p>
+            )}
+            {insight.suggestedTouch && (
+              <p className="badger-card-move">
+                <span className="badger-card-move-arrow">→</span>{' '}
+                {insight.suggestedTouch}
+              </p>
+            )}
+            {insight.suggestedValueAdd && (
+              <p className="badger-card-valueadd">
+                <span className="badger-card-valueadd-mark">✦</span>{' '}
+                {insight.suggestedValueAdd}
+              </p>
+            )}
+            {insight.contextNote && (
+              <p className="badger-card-context">{insight.contextNote}</p>
+            )}
+          </div>
+        </div>
 
         <div className="workspace-body">
           <nav className="workspace-nav" aria-label="Client record sections">

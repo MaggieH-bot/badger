@@ -41,6 +41,9 @@ export type InsightPriority = 'high' | 'medium' | 'low';
 
 export interface BadgerInsight {
   priority: InsightPriority;
+  // Short punchy hook — the bold headline line in the Badger Briefing Card.
+  headline: string;
+  // Supporting body beneath the headline. May be empty for one-line insights.
   reason: string;
   suggestedTouch: string;
   suggestedValueAdd: string;

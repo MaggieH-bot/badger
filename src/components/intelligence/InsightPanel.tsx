@@ -5,6 +5,10 @@ interface InsightPanelProps {
   dealName?: string;
   onClick?: () => void;
   variant?: 'compact' | 'full';
+  // Hide the High/Med/Low priority chip. It's a list-triage signal and adds
+  // noise on a single record, so the in-record callout passes this true.
+  // The priority still drives the panel's accent color via the class below.
+  hidePriority?: boolean;
 }
 
 const PRIORITY_LABELS: Record<InsightPriority, string> = {
@@ -18,6 +22,7 @@ export function InsightPanel({
   dealName,
   onClick,
   variant = 'compact',
+  hidePriority = false,
 }: InsightPanelProps) {
   const className = [
     'insight-panel',
@@ -28,14 +33,20 @@ export function InsightPanel({
     .filter(Boolean)
     .join(' ');
 
+  const showHeader = !hidePriority || Boolean(dealName);
+
   const content = (
     <>
-      <div className="insight-panel-header">
-        <span className={`insight-priority insight-priority--${insight.priority}`}>
-          {PRIORITY_LABELS[insight.priority]}
-        </span>
-        {dealName && <span className="insight-deal-name">{dealName}</span>}
-      </div>
+      {showHeader && (
+        <div className="insight-panel-header">
+          {!hidePriority && (
+            <span className={`insight-priority insight-priority--${insight.priority}`}>
+              {PRIORITY_LABELS[insight.priority]}
+            </span>
+          )}
+          {dealName && <span className="insight-deal-name">{dealName}</span>}
+        </div>
+      )}
       <p className="insight-reason">{insight.reason}</p>
       {insight.suggestedTouch && (
         <p className="insight-touch">→ {insight.suggestedTouch}</p>

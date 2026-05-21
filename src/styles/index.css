@@ -2943,6 +2943,114 @@ body {
 
 /* --- Insight panel --- */
 
+/* Badger Briefing Card — one consistent branded treatment (no priority
+   colors). A contained card under the header that frames the record: calm
+   blue-gray base, amber accent for identity (avatar badge, eyebrow, arrow).
+   Brand colors: #59757a blue-gray, #b56b05 accent. */
+.badger-card {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px var(--space-lg);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(89, 117, 122, 0.14);
+  border: 1px solid rgba(89, 117, 122, 0.3);
+  border-left: 3px solid #b56b05;
+}
+
+/* Subtle one-time entrance when the record opens. Only when motion is OK. */
+@media (prefers-reduced-motion: no-preference) {
+  .badger-card {
+    animation: badger-card-in 240ms ease-out both;
+  }
+}
+
+@keyframes badger-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.badger-card-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #b56b05;
+}
+
+.badger-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.badger-card-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b56b05;
+}
+
+.badger-card-headline {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.badger-card-reason {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.badger-card-move {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.badger-card-move-arrow {
+  color: #b56b05;
+  font-weight: 700;
+}
+
+.badger-card-valueadd {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.badger-card-valueadd-mark {
+  color: #b56b05;
+  font-weight: 700;
+}
+
+.badger-card-context {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
 .insight-panel {
   display: block;
   width: 100%;
