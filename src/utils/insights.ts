@@ -360,13 +360,39 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
   // ============================================
 
   if (d.stage === 'lead') {
+    // Every deal that reaches here has been contacted at least once — the
+    // neverContacted gate above already returned. So lead-stage copy assumes
+    // a conversation has happened and drives the next move; it never tells you
+    // to make a first touch you've already made. Stage stays put either way:
+    // a logged activity does not mean the client hired you.
     if (d.opportunityType === 'buy' || d.opportunityType === 'rent') {
+      if (d.followUpStatus === 'needs_attention') {
+        return {
+          priority: 'medium',
+          headline: "You connected with this buyer — and it's cooling.",
+          reason: `${daysPhrase(d.daysSinceContact)} of quiet. Buyers don't wait around — they tour someone else's listings.`,
+          suggestedTouch: hasNextStep(d)
+            ? smartTouch(d)
+            : `Re-engage today: 2–3 fresh listings in ${areaPhrase(d)} and grab a tour window.`,
+          suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
+      if (hasNextStep(d)) {
+        return {
+          priority: 'medium',
+          headline: "You're working this buyer — keep the momentum.",
+          reason: "They're engaged. Now move them toward touring.",
+          suggestedTouch: smartTouch(d),
+          suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
       return {
         priority: 'medium',
-        headline: "Fresh buyer lead — that's a real shot.",
-        reason: "Strike while they're still excited.",
-        suggestedTouch:
-          'Book a discovery call today: budget, timeline, must-haves.',
+        headline: "You've connected with this buyer — now set the next move.",
+        reason: 'No next step on the board. Pin one before the excitement fades.',
+        suggestedTouch: `Lock a discovery call or a tour window in ${areaPhrase(d)}, and put a date on it.`,
         suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
         contextNote: contextNoteOf(d),
       };
@@ -378,9 +404,11 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
       if (d.sequencing === 'buy_first') {
         return {
           priority: 'medium',
-          headline: 'Buy-and-sell client, buying first — lead with the buy side.',
-          reason: "That's the lane that moves first, so put your energy there.",
-          suggestedTouch: 'Book a buyer discovery call today: budget, timeline, must-haves.',
+          headline: 'Buy-and-sell client, buying first — drive the buy side.',
+          reason: "You're connected. The buy lane moves first, so put your energy there.",
+          suggestedTouch: hasNextStep(d)
+            ? smartTouch(d)
+            : `Move the buy side: a tour window or a fresh short list in ${areaPhrase(d)}, with a date on it.`,
           suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
           contextNote: contextNoteOf(d),
         };
@@ -388,9 +416,11 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
       if (d.sequencing === 'sell_first') {
         return {
           priority: 'medium',
-          headline: 'Buy-and-sell client, selling first — start the listing.',
-          reason: 'The sale funds the next move, so get it rolling.',
-          suggestedTouch: 'Book the walkthrough and a real pricing conversation before the spark fades.',
+          headline: 'Buy-and-sell client, selling first — drive the listing.',
+          reason: 'The sale funds the next move, so keep it heading toward listed.',
+          suggestedTouch: hasNextStep(d)
+            ? smartTouch(d)
+            : 'Pin the next move toward listed — pricing, prep, or the listing agreement — with a date.',
           suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
           contextNote: contextNoteOf(d),
         };
@@ -400,7 +430,9 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
           priority: 'medium',
           headline: 'Buy-and-sell client, running both at once.',
           reason: 'Doable — but a set order would let you both move faster.',
-          suggestedTouch: 'Push both sides, and float the question: should buying or selling lead?',
+          suggestedTouch: hasNextStep(d)
+            ? smartTouch(d)
+            : 'Push both sides, and float the question: should buying or selling lead?',
           suggestedValueAdd: `Send what's moving in ${areaPhrase(d)} — both sides.`,
           contextNote: contextNoteOf(d),
         };
@@ -409,28 +441,54 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
       return {
         priority: 'medium',
         headline: 'Buy-and-sell client — which comes first?',
-        reason: "With no sequence set, the plan's pulling two directions at once.",
-        suggestedTouch: 'Lock down whether they buy or sell first — it sets everything else in motion.',
+        reason: "You're talking, but with no sequence set the plan's pulling two directions at once.",
+        suggestedTouch: hasNextStep(d)
+          ? smartTouch(d)
+          : 'Lock down whether they buy or sell first — it sets everything else in motion.',
         suggestedValueAdd: `Send what's moving in ${areaPhrase(d)} — both sides — while you sort the order.`,
         contextNote: contextNoteOf(d),
       };
     }
     if (d.opportunityType === 'sell') {
+      if (d.followUpStatus === 'needs_attention') {
+        return {
+          priority: 'medium',
+          headline: "You opened the door with this seller — now it's drifting.",
+          reason: `${daysPhrase(d.daysSinceContact)} of quiet. A warm seller cools into someone else's listing fast.`,
+          suggestedTouch: hasNextStep(d)
+            ? smartTouch(d)
+            : 'Get back in front of them today and lock the next move toward listed.',
+          suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
+      if (hasNextStep(d)) {
+        return {
+          priority: 'medium',
+          headline: "You're working this seller — keep pushing toward listed.",
+          reason: 'They\'re engaged. Now convert the conversation into a signed listing.',
+          suggestedTouch: smartTouch(d),
+          suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
       return {
         priority: 'medium',
-        headline: 'A seller just raised their hand — that\'s a real shot.',
-        reason: '"Interested" has a shelf life.',
-        suggestedTouch: 'Book the walkthrough and a real pricing conversation before the spark fades.',
+        headline: "You've talked to this seller — what's the next move toward listed?",
+        reason: "No next step on the board, and momentum with a seller dies in the gap between conversations.",
+        suggestedTouch: 'Pin the next concrete step — pricing, prep, or the listing agreement — and put a date on it.',
         suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
         contextNote: contextNoteOf(d),
       };
     }
-    // Type unset — generic lead nudge
+    // Type unset — you've made contact but the plan is still thin.
     return {
       priority: 'medium',
-      headline: 'New lead, fresh and full of potential.',
-      reason: 'You just need to know what they want.',
-      suggestedTouch: 'Quick discovery call today to lock down intent and timeline.',
+      headline: "You've made contact — now nail down what they want.",
+      reason: "You're talking, but the plan's thin. Buy? Sell? What's the timeline?",
+      suggestedTouch: hasNextStep(d)
+        ? smartTouch(d)
+        : 'Pin their intent and timeline today, then set a concrete next step.',
       suggestedValueAdd: 'Light market overview based on their stated area.',
       contextNote: contextNoteOf(d),
     };
