@@ -371,7 +371,51 @@ export function computeInsight(d: DealWithUrgency): BadgerInsight {
         contextNote: contextNoteOf(d),
       };
     }
-    if (d.opportunityType === 'sell' || d.opportunityType === 'both') {
+    // Buy-and-sell: sequencing decides which lane Badger leads with. At lead
+    // stage no lane is chosen yet, so an unset/unknown sequence is itself the
+    // thing to fix. (Non-lead stages let the stage stand as the active lane.)
+    if (d.opportunityType === 'both') {
+      if (d.sequencing === 'buy_first') {
+        return {
+          priority: 'medium',
+          headline: 'Buy-and-sell client, buying first — lead with the buy side.',
+          reason: "That's the lane that moves first, so put your energy there.",
+          suggestedTouch: 'Book a buyer discovery call today: budget, timeline, must-haves.',
+          suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
+      if (d.sequencing === 'sell_first') {
+        return {
+          priority: 'medium',
+          headline: 'Buy-and-sell client, selling first — start the listing.',
+          reason: 'The sale funds the next move, so get it rolling.',
+          suggestedTouch: 'Book the walkthrough and a real pricing conversation before the spark fades.',
+          suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
+      if (d.sequencing === 'parallel') {
+        return {
+          priority: 'medium',
+          headline: 'Buy-and-sell client, running both at once.',
+          reason: 'Doable — but a set order would let you both move faster.',
+          suggestedTouch: 'Push both sides, and float the question: should buying or selling lead?',
+          suggestedValueAdd: `Send what's moving in ${areaPhrase(d)} — both sides.`,
+          contextNote: contextNoteOf(d),
+        };
+      }
+      // Sequencing unset or 'unknown' → the sequence itself is the issue.
+      return {
+        priority: 'medium',
+        headline: 'Buy-and-sell client — which comes first?',
+        reason: "With no sequence set, the plan's pulling two directions at once.",
+        suggestedTouch: 'Lock down whether they buy or sell first — it sets everything else in motion.',
+        suggestedValueAdd: `Send what's moving in ${areaPhrase(d)} — both sides — while you sort the order.`,
+        contextNote: contextNoteOf(d),
+      };
+    }
+    if (d.opportunityType === 'sell') {
       return {
         priority: 'medium',
         headline: 'A seller just raised their hand — that\'s a real shot.',
