@@ -167,12 +167,68 @@ const CLOSED_INSIGHT: BadgerInsight = {
   suggestedValueAdd: '',
 };
 
+// First touch for a never-contacted buy-and-sell lead. Sequencing picks the
+// lane up front so the focus matches the lead-stage rule below — the moment a
+// first activity is logged and `neverContacted` flips false, the lead block
+// returns the same lane and nothing bounces. Stays 'high' like every other
+// untouched lead. Only used for stage = 'lead'; non-lead 'both' stages keep
+// their own stage lane.
+function firstTouchBoth(d: Deal): BadgerInsight {
+  const ctx = contextNoteOf(d);
+  if (d.sequencing === 'buy_first') {
+    return {
+      priority: 'high',
+      headline: 'Buy-and-sell client, buying first — untouched, all upside.',
+      reason: 'Every cold day is a day someone else calls first, and the buy lane moves first.',
+      suggestedTouch: 'Make the intro today: book a buyer discovery call — budget, timeline, must-haves.',
+      suggestedValueAdd: `Send a starter set of listings in ${areaPhrase(d)}.`,
+      contextNote: ctx,
+    };
+  }
+  if (d.sequencing === 'sell_first') {
+    return {
+      priority: 'high',
+      headline: 'Buy-and-sell client, selling first — untouched, all upside.',
+      reason: 'Every cold day is a day someone else calls first, and the sale funds the next move.',
+      suggestedTouch: 'Make the intro today: book the walkthrough and a real pricing conversation.',
+      suggestedValueAdd: `Send recent comps in ${areaPhrase(d)} and a prelisting checklist.`,
+      contextNote: ctx,
+    };
+  }
+  if (d.sequencing === 'parallel') {
+    return {
+      priority: 'high',
+      headline: 'Buy-and-sell client, both sides at once — untouched, all upside.',
+      reason: "Every cold day is a day someone else calls first — and a set order would let you both move faster.",
+      suggestedTouch: 'Make the intro today, and float the question: should buying or selling lead?',
+      suggestedValueAdd: `Send what's moving in ${areaPhrase(d)} — both sides.`,
+      contextNote: ctx,
+    };
+  }
+  // Sequencing unset or 'unknown' → the sequence itself is the first thing to fix.
+  return {
+    priority: 'high',
+    headline: 'Buy-and-sell client — untouched, and no sequence set.',
+    reason: "Every cold day is a day someone else calls first — and with no sequence set, the plan pulls two directions at once.",
+    suggestedTouch: 'Make the intro today and lock down whether they buy or sell first — it sets everything else in motion.',
+    suggestedValueAdd: `Send what's moving in ${areaPhrase(d)} — both sides — while you sort the order.`,
+    contextNote: ctx,
+  };
+}
+
 export function computeInsight(d: DealWithUrgency): BadgerInsight {
   // 1. Closed → no actionable insight.
   if (d.stage === 'closed') return CLOSED_INSIGHT;
 
   // 2. Never contacted → log first touch (beats every category/stage rule).
   if (d.neverContacted) {
+    // Buy-and-sell leads pick their lane from sequencing even before the first
+    // touch, so the focus matches the lead-stage rule and never flips once an
+    // activity is logged. Only at lead stage — non-lead 'both' stages keep
+    // their stage lane.
+    if (d.opportunityType === 'both' && d.stage === 'lead') {
+      return firstTouchBoth(d);
+    }
     return {
       priority: 'high',
       headline: "New opportunity, all upside — and totally untouched.",
