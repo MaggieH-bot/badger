@@ -435,11 +435,6 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
 
         {showSequencing && (
           <>
-            <div className="phase-a-both-note">
-              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
-              and Next Step are coming in a later update — for now, fill the lane that
-              currently matters most and use Notes for the other side.
-            </div>
             <div className="form-field">
               <label htmlFor="dt-sequencing">Sequencing</label>
               <select
@@ -456,6 +451,15 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
                   </option>
                 ))}
               </select>
+            </div>
+            <div
+              className={`phase-a-both-note${
+                form.sequencing ? '' : ' phase-a-both-note--urgent'
+              }`}
+            >
+              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
+              and Next Step are coming in a later update — for now, fill the lane that
+              currently matters most and use Notes for the other side.
             </div>
           </>
         )}
