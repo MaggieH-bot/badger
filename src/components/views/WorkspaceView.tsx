@@ -74,11 +74,11 @@ export function WorkspaceView() {
     if (!workspace || !user) return;
     const email = inviteEmail.trim().toLowerCase();
     if (!email) {
-      setInviteError('Email is required.');
+      setInviteError('Pop in an email first.');
       return;
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
-      setInviteError('Enter a valid email address.');
+      setInviteError("That doesn't look like an email.");
       return;
     }
 
@@ -89,17 +89,17 @@ export function WorkspaceView() {
     createInvite(email, workspace.id, user.id)
       .then(() => {
         setInviteEmail('');
-        setInviteSentFlash(`Invite sent to ${email}.`);
+        setInviteSentFlash(`Invite's out to ${email}.`);
         refresh();
       })
       .catch((err) => {
         console.error('[badger] invite create failed:', err);
         const message =
           err instanceof Error && /duplicate|unique/i.test(err.message)
-            ? 'That email already has a pending invite for this workspace.'
+            ? "That email's already got an invite waiting."
             : err instanceof Error
               ? err.message
-              : 'Could not send invite.';
+              : "Couldn't send that invite. Try again.";
         setInviteError(message);
       })
       .finally(() => {
@@ -108,7 +108,7 @@ export function WorkspaceView() {
   }
 
   function handleRevoke(inviteId: string) {
-    if (!window.confirm('Revoke this invite?')) return;
+    if (!window.confirm('Pull this invite back?')) return;
     revokeInvite(inviteId)
       .then(() => refresh())
       .catch((err) => {
@@ -181,7 +181,7 @@ export function WorkspaceView() {
         {loading ? (
           <p className="workspace-muted">Loading…</p>
         ) : members.length === 0 ? (
-          <p className="workspace-muted">No members.</p>
+          <p className="workspace-muted">Nobody here yet.</p>
         ) : (
           <ul className="workspace-list">
             {members.map((m) => (

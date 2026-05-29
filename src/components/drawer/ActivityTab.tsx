@@ -62,7 +62,7 @@ function LogActivityForm({ deal }: { deal: Deal }) {
     e.preventDefault();
     const trimmed = summary.trim();
     if (!trimmed) {
-      setError('Summary is required.');
+      setError('Jot down what happened first.');
       return;
     }
 
@@ -87,8 +87,8 @@ function LogActivityForm({ deal }: { deal: Deal }) {
     setError('');
     setFlash(
       wasFirstTouch
-        ? 'Activity logged. Client moved out of First Touch.'
-        : 'Activity logged.',
+        ? "Touch logged — they're off the First Touch list. Nice."
+        : 'Touch logged. Clock reset.',
     );
     window.setTimeout(() => setFlash(null), 3000);
   }
@@ -292,7 +292,7 @@ function NoteEditor({
   function handleSave() {
     const trimmed = content.trim();
     if (!trimmed) {
-      setError('Note cannot be empty.');
+      setError('Empty note — give Badger something to save.');
       return;
     }
     dispatch({
@@ -348,7 +348,7 @@ function AddNoteForm({ dealId }: { dealId: string }) {
     e.preventDefault();
     const trimmed = content.trim();
     if (!trimmed) {
-      setError('Note cannot be empty.');
+      setError('Empty note — give Badger something to save.');
       return;
     }
 
@@ -427,7 +427,7 @@ function NoteItem({ dealId, note }: { dealId: string; note: NoteType }) {
   const [editing, setEditing] = useState(false);
 
   function handleDelete() {
-    if (window.confirm('Delete this note?')) {
+    if (window.confirm("Delete this note? It's gone for good.")) {
       dispatch({ type: 'DELETE_NOTE', dealId, noteId: note.id });
     }
   }
@@ -494,7 +494,7 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
           </p>
           <LogActivityForm deal={deal} />
           {logEntries.length === 0 ? (
-            <p className="empty-state empty-state--spaced">No activity logged yet.</p>
+            <p className="empty-state empty-state--spaced">No touches logged yet. Be the first.</p>
           ) : (
             <div className="log-entries">
               {logEntries.map((entry) => (
@@ -522,7 +522,7 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
           </p>
           <AddNoteForm dealId={deal.id} />
           {deal.notes.length === 0 ? (
-            <p className="empty-state">No notes yet.</p>
+            <p className="empty-state">No notes yet. Jot down what you don't want to forget.</p>
           ) : (
             <div className="notes-list">
               {deal.notes.map((note) => (

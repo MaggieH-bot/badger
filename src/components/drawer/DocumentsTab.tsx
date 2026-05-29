@@ -71,13 +71,13 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
       return;
     }
     if (f.type !== 'application/pdf') {
-      setErrors((prev) => ({ ...prev, file: 'Only PDF files are supported.' }));
+      setErrors((prev) => ({ ...prev, file: 'PDFs only, please.' }));
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
     if (f.size > MAX_FILE_BYTES) {
-      setErrors((prev) => ({ ...prev, file: 'File is larger than 25 MB.' }));
+      setErrors((prev) => ({ ...prev, file: "That's over 25 MB — too big to attach." }));
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
@@ -95,10 +95,10 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
     const trimmedContent = content.trim();
     const newErrors: typeof errors = {};
 
-    if (!trimmedTitle) newErrors.title = 'Name is required.';
+    if (!trimmedTitle) newErrors.title = 'Give it a name first.';
     // Either notes OR a file is required — file-only documents are valid.
     if (!trimmedContent && !file) {
-      newErrors.body = 'Add notes or attach a PDF.';
+      newErrors.body = 'Add a note or attach a PDF — Badger needs something to save.';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -132,8 +132,8 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
         setErrors({
           file:
             err instanceof Error
-              ? `Upload failed: ${err.message}`
-              : 'Upload failed.',
+              ? `Upload didn't take: ${err.message}`
+              : "Upload didn't take. Try again.",
         });
         setBusy(false);
         return;
@@ -406,7 +406,7 @@ function DocumentItem({ dealId, doc }: { dealId: string; doc: DocType }) {
   const [openError, setOpenError] = useState<string | null>(null);
 
   function handleDelete() {
-    if (window.confirm(`Delete "${doc.title}"?`)) {
+    if (window.confirm(`Delete "${doc.title}"? No undo.`)) {
       dispatch({
         type: 'DELETE_DOCUMENT',
         dealId,
