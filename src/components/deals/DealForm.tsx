@@ -215,6 +215,15 @@ export function DealForm({ onClose }: DealFormProps) {
 
         {showSequencing && (
           <>
+            <div
+              className={`phase-a-both-note${
+                sequencing ? '' : ' phase-a-both-note--urgent'
+              }`}
+            >
+              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
+              and Next Step are coming in a later update — for now, fill the lane that
+              currently matters most and use Notes for the other side.
+            </div>
             <div className="form-field">
               <label htmlFor="df-sequencing">Sequencing</label>
               <select
@@ -229,15 +238,6 @@ export function DealForm({ onClose }: DealFormProps) {
                   </option>
                 ))}
               </select>
-            </div>
-            <div
-              className={`phase-a-both-note${
-                sequencing ? '' : ' phase-a-both-note--urgent'
-              }`}
-            >
-              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
-              and Next Step are coming in a later update — for now, fill the lane that
-              currently matters most and use Notes for the other side.
             </div>
           </>
         )}
