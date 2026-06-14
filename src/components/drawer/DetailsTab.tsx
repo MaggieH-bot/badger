@@ -416,30 +416,38 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
       <section id="section-status" className="record-section">
         <h3 className="record-section-title">Status</h3>
 
-        <div className="form-field">
-          <label htmlFor="dt-probability">Probability</label>
-          <div className="form-suffix-input form-suffix-input--narrow">
-            <input
-              id="dt-probability"
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={form.probability}
-              onChange={(e) => handleChange('probability', e.target.value)}
-            />
-            <span className="form-suffix">%</span>
-          </div>
-          {errors.probability && <span className="form-error">{errors.probability}</span>}
-        </div>
-
         {showSequencing && (
-          <>
-            <div className="phase-a-both-note">
-              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
-              and Next Step are coming in a later update — for now, fill the lane that
-              currently matters most and use Notes for the other side.
+          <div
+            className={`phase-a-both-note${
+              form.sequencing ? '' : ' phase-a-both-note--urgent'
+            }`}
+          >
+            <strong>This client is buying and selling.</strong>{' '}
+            {form.sequencing
+              ? 'Badger is coaching the lane you picked — work it here and keep the other side in Notes.'
+              : 'Let Badger know which comes first — buying or selling — so it can point you at the right next move. Work that lane here and keep the other side in Notes.'}
+          </div>
+        )}
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="dt-probability">Probability</label>
+            <div className="form-suffix-input form-suffix-input--narrow">
+              <input
+                id="dt-probability"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={form.probability}
+                onChange={(e) => handleChange('probability', e.target.value)}
+              />
+              <span className="form-suffix">%</span>
             </div>
+            {errors.probability && <span className="form-error">{errors.probability}</span>}
+          </div>
+
+          {showSequencing && (
             <div className="form-field">
               <label htmlFor="dt-sequencing">Sequencing</label>
               <select
@@ -457,8 +465,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
                 ))}
               </select>
             </div>
-          </>
-        )}
+          )}
+        </div>
       </section>
 
       <section id="section-property-price" className="record-section">

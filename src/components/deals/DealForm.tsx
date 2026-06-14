@@ -215,10 +215,15 @@ export function DealForm({ onClose }: DealFormProps) {
 
         {showSequencing && (
           <>
-            <div className="phase-a-both-note">
-              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
-              and Next Step are coming in a later update — for now, fill the lane that
-              currently matters most and use Notes for the other side.
+            <div
+              className={`phase-a-both-note${
+                sequencing ? '' : ' phase-a-both-note--urgent'
+              }`}
+            >
+              <strong>This client is buying and selling.</strong>{' '}
+              {sequencing
+                ? 'Badger is coaching the lane you picked — work it here and keep the other side in Notes.'
+                : 'Let Badger know which comes first — buying or selling — so it can point you at the right next move. Work that lane here and keep the other side in Notes.'}
             </div>
             <div className="form-field">
               <label htmlFor="df-sequencing">Sequencing</label>

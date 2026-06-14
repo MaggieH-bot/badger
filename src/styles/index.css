@@ -3694,6 +3694,18 @@ body {
   color: var(--accent);
 }
 
+/* Urgent state — shown while a Both client has no sequence set yet. Mirrors the
+   top-of-record insight telling the user to pick a lane. Reverts to the calm
+   accent treatment above once sequencing is chosen. */
+.phase-a-both-note--urgent {
+  background: var(--alert-bg);
+  border-color: rgba(208, 69, 53, 0.45);
+}
+
+.phase-a-both-note--urgent strong {
+  color: var(--alert);
+}
+
 /* ============================================
    Opportunity Type pill (Buy / Sell / Both / Rent)
    Used in deal card headers and the Pipeline table.
