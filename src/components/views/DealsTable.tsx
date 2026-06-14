@@ -322,18 +322,18 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
         <div className="empty-state">
           {isSearching && hiddenBySearch > 0 ? (
             <>
-              <p>No clients found.</p>
-              <p>No match for "{searchQuery.trim()}". Clear the search to see all clients.</p>
+              <p>Nothing matches that.</p>
+              <p>No one called "{searchQuery.trim()}". Clear the search to see everyone.</p>
             </>
           ) : mode === 'pipeline' ? (
             <>
-              <p>No active clients match the current filter.</p>
-              <p>Click "+ Add Client" to create a client, or change the team filter.</p>
+              <p>No clients fit this filter.</p>
+              <p>Loosen the team filter, or hit "+ Add Client" to start one.</p>
             </>
           ) : (
             <>
-              <p>No closed transactions match the current filter.</p>
-              <p>Closed clients will appear here once their stage is set to Closed.</p>
+              <p>No closed deals here yet.</p>
+              <p>Wins land here the moment a client's stage flips to Closed.</p>
             </>
           )}
         </div>

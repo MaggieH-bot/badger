@@ -122,7 +122,7 @@ function WorkspaceGate({ children }: { children: ReactNode }) {
       <div className="error-screen">
         <div className="error-screen-card">
           <h2 className="error-screen-title">Couldn't set up your workspace</h2>
-          <p className="error-screen-detail">{error ?? 'Unknown error.'}</p>
+          <p className="error-screen-detail">{error ?? "Not sure what tripped it up. Give it another shot."}</p>
           <button type="button" className="btn btn--primary" onClick={retry}>
             Retry
           </button>

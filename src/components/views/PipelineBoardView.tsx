@@ -48,8 +48,8 @@ export function PipelineBoardView({
   if (isSearching && searchFiltered.length === 0) {
     return (
       <div className="empty-state">
-        <p>No clients found.</p>
-        <p>No match for "{searchQuery.trim()}". Clear the search to see all clients.</p>
+        <p>Nothing matches that.</p>
+        <p>No one called "{searchQuery.trim()}". Clear the search to see everyone.</p>
       </div>
     );
   }

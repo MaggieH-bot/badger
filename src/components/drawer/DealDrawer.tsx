@@ -85,7 +85,7 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   // is already gone or filtered out).
   function requestClose() {
     if (isAnyDirty()) {
-      const ok = window.confirm('Discard unsaved changes?');
+      const ok = window.confirm('Toss your unsaved changes?');
       if (!ok) return;
     }
     onClose();
@@ -147,7 +147,7 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   function handleDelete() {
     if (!deal) return;
     const ok = window.confirm(
-      `Delete ${deal.clientName}? This removes all contact history, notes, and documents and cannot be undone.`,
+      `Delete ${deal.clientName}? Every touch, note, and document goes with them — no undo.`,
     );
     if (!ok) return;
     dispatch({ type: 'DELETE_DEAL', dealId: deal.id });
@@ -205,7 +205,7 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
         !modalRef.current.contains(e.target as Node)
       ) {
         if (isAnyDirty()) {
-          const ok = window.confirm('Discard unsaved changes?');
+          const ok = window.confirm('Toss your unsaved changes?');
           if (!ok) return;
         }
         onClose();
@@ -323,8 +323,8 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
                 <div className="danger-zone-copy">
                   <p className="danger-zone-heading">Delete this client</p>
                   <p className="danger-zone-detail">
-                    Permanently removes {deal.clientName}, including contact
-                    history, notes, and documents.
+                    Wipes {deal.clientName} for good — every touch, note, and
+                    document goes with them.
                   </p>
                 </div>
                 <button

@@ -104,14 +104,14 @@ export function DealForm({ onClose }: DealFormProps) {
     const trimmedName = clientName.trim();
     const newErrors: typeof errors = {};
 
-    if (!trimmedName) newErrors.clientName = 'Client name is required.';
+    if (!trimmedName) newErrors.clientName = 'Give this client a name first.';
 
     const probTrim = probability.trim();
     let parsedProbability: number | undefined;
     if (probTrim) {
       parsedProbability = parseProbability(probTrim);
       if (parsedProbability === undefined) {
-        newErrors.probability = 'Probability must be an integer between 0 and 100.';
+        newErrors.probability = "Probability's a whole number from 0 to 100.";
       }
     }
 

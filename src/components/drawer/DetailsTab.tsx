@@ -190,13 +190,13 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     const trimmedName = form.clientName.trim();
     const newErrors: typeof errors = {};
 
-    if (!trimmedName) newErrors.clientName = 'Client name is required.';
+    if (!trimmedName) newErrors.clientName = 'Give this client a name first.';
 
     const probTrim = form.probability.trim();
     if (probTrim) {
       const parsed = parseProbability(probTrim);
       if (parsed === undefined) {
-        newErrors.probability = 'Probability must be an integer between 0 and 100.';
+        newErrors.probability = "Probability's a whole number from 0 to 100.";
       }
     }
 

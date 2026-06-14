@@ -32,7 +32,7 @@ export function ImportView() {
       setResult(parsed);
       setStage('preview');
     } catch (err) {
-      setFileError(`Could not read file: ${err instanceof Error ? err.message : 'unknown error'}`);
+      setFileError(`Couldn't read that file: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       // Reset the input so re-selecting the same file works
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -293,7 +293,7 @@ function DoneStage({
   return (
     <div className="import-done">
       <p className="import-done-msg">
-        ✓ Imported {count} {count === 1 ? 'client' : 'clients'}.
+        ✓ {count} {count === 1 ? 'client' : 'clients'} in. Badger's on it.
       </p>
       <div className="form-actions">
         <button type="button" className="btn btn--secondary" onClick={onStartOver}>
