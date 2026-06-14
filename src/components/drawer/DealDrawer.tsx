@@ -13,6 +13,7 @@ import { BadgerAvatar } from '../BadgerAvatar';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
+import { PrepareChecklistButton } from './PrepareChecklistButton';
 
 type SectionKey =
   | 'overview'
@@ -281,6 +282,7 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
             {insight.contextNote && (
               <p className="badger-card-context">{insight.contextNote}</p>
             )}
+            <PrepareChecklistButton deal={deal} />
           </div>
         </div>
 

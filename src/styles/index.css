@@ -3051,6 +3051,50 @@ body {
   color: var(--text-secondary);
 }
 
+/* 15W-35: "Prepare" action — Badger builds the recommended deliverable. */
+.badger-card-prepare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.badger-prepare-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid #b56b05;
+  background: rgba(181, 107, 5, 0.12);
+  color: #b56b05;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.badger-prepare-btn:hover:not(:disabled) {
+  background: rgba(181, 107, 5, 0.2);
+}
+
+.badger-prepare-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.badger-prepare-flash {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.badger-prepare-error {
+  font-size: 12px;
+  color: var(--danger, #c0392b);
+}
+
 .insight-panel {
   display: block;
   width: 100%;
