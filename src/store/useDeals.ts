@@ -21,6 +21,8 @@ type DealsAction =
   | { type: 'ADD_DEALS'; deals: Deal[] }
   | { type: 'UPDATE_DEAL'; deal: Deal }
   | { type: 'DELETE_DEAL'; dealId: string }
+  | { type: 'ARCHIVE_DEAL'; dealId: string }
+  | { type: 'UNARCHIVE_DEAL'; dealId: string }
   | { type: 'ADD_CONTACT_LOG'; dealId: string; entry: ContactLogEntry }
   | { type: 'ADD_NOTE'; dealId: string; note: Note }
   | { type: 'UPDATE_NOTE'; dealId: string; note: Note }
@@ -60,6 +62,22 @@ function dealsReducer(state: Deal[], action: DealsAction): Deal[] {
 
     case 'DELETE_DEAL':
       return state.filter((d) => d.id !== action.dealId);
+
+    case 'ARCHIVE_DEAL':
+      return updateDealInList(state, action.dealId, (deal) => ({
+        ...deal,
+        archived: true,
+        archivedAt: now,
+        updatedAt: now,
+      }));
+
+    case 'UNARCHIVE_DEAL':
+      return updateDealInList(state, action.dealId, (deal) => ({
+        ...deal,
+        archived: false,
+        archivedAt: undefined,
+        updatedAt: now,
+      }));
 
     case 'ADD_CONTACT_LOG':
       return updateDealInList(state, action.dealId, (deal) => ({

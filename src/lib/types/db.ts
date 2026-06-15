@@ -49,6 +49,11 @@ export interface DealRow {
   lead_source: string | null;
 
   last_contact: string | null;
+
+  // Archive (orthogonal to stage/category) — 15W-69
+  archived: boolean;
+  archived_at: string | null;
+
   created_at: string;
   updated_at: string;
   created_by: string | null;

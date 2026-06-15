@@ -25,6 +25,19 @@ export function followUpStatusOf(urgency: Urgency): FollowUpStatus {
 }
 
 export function computeUrgency(deal: Deal, now: Date = new Date()): DealWithUrgency {
+  // Archived deals are set aside — never surface urgency or nudges. Defensive:
+  // active views already exclude them, but this keeps them calm if rendered
+  // (e.g. in the Archived view).
+  if (deal.archived) {
+    return {
+      ...deal,
+      urgency: 'none',
+      followUpStatus: 'none',
+      daysSinceContact: 0,
+      neverContacted: !deal.lastContact,
+    };
+  }
+
   // Closed deals always produce 'none' regardless of contact history.
   if (deal.stage === 'closed') {
     return {

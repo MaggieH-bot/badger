@@ -88,6 +88,8 @@ export function rowToDeal(row: DealRowWithChildren): Deal {
     motivation: row.motivation ?? undefined,
     blocker: row.blocker ?? undefined,
     leadSource: row.lead_source ?? undefined,
+    archived: row.archived ?? undefined,
+    archivedAt: row.archived_at ?? undefined,
     lastContact,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -142,6 +144,8 @@ export function dealToInsertRow(
     motivation: deal.motivation ?? null,
     blocker: deal.blocker ?? null,
     lead_source: deal.leadSource ?? null,
+    archived: deal.archived ?? false,
+    archived_at: deal.archivedAt ?? null,
     last_contact: deal.lastContact ?? null,
     created_by: userId,
   };
@@ -172,6 +176,8 @@ export function dealToUpdateRow(deal: Deal): DealUpdateRow {
     motivation: deal.motivation ?? null,
     blocker: deal.blocker ?? null,
     lead_source: deal.leadSource ?? null,
+    archived: deal.archived ?? false,
+    archived_at: deal.archivedAt ?? null,
     last_contact: deal.lastContact ?? null,
   };
 }

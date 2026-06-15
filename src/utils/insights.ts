@@ -167,6 +167,14 @@ const CLOSED_INSIGHT: BadgerInsight = {
   suggestedValueAdd: '',
 };
 
+const ARCHIVED_INSIGHT: BadgerInsight = {
+  priority: 'low',
+  headline: 'Archived — set aside for now.',
+  reason: "It's out of your active pipeline. Nothing here needs you.",
+  suggestedTouch: 'Restore it from the Archive section if this one heats back up.',
+  suggestedValueAdd: '',
+};
+
 // First touch for a never-contacted buy-and-sell lead. Sequencing picks the
 // lane up front so the focus matches the lead-stage rule below — the moment a
 // first activity is logged and `neverContacted` flips false, the lead block
@@ -217,6 +225,9 @@ function firstTouchBoth(d: Deal): BadgerInsight {
 }
 
 export function computeInsight(d: DealWithUrgency): BadgerInsight {
+  // 0. Archived → set aside; no nudge (shown if opened from the Archived view).
+  if (d.archived) return ARCHIVED_INSIGHT;
+
   // 1. Closed → no actionable insight.
   if (d.stage === 'closed') return CLOSED_INSIGHT;
 

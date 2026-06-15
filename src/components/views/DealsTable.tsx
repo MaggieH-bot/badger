@@ -11,7 +11,7 @@ import { DealCard } from '../deals/DealCard';
 import { matchesSearch } from '../../utils/search';
 import { formatPriceRange } from '../../utils/priceRange';
 
-export type DealsTableMode = 'pipeline' | 'closed';
+export type DealsTableMode = 'pipeline' | 'closed' | 'archived';
 
 interface DealsTableProps {
   mode: DealsTableMode;
@@ -201,6 +201,8 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   const { members } = useWorkspaceMembers();
   const isClosed = mode === 'closed';
   const columns = isClosed ? CLOSED_COLUMNS : PIPELINE_COLUMNS;
+  const bannerScope =
+    mode === 'pipeline' ? 'active' : mode === 'closed' ? 'closed' : 'archived';
 
   // Default sort: pipeline goes by client last name A–Z; closed keeps the
   // prior Last-Contact-desc behavior.
@@ -211,8 +213,12 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     isClosed ? 'desc' : 'asc',
   );
 
-  // Stage filter by mode (active vs closed) — used to compute filter-hidden count
+  // Mode filter — used to compute filter-hidden count. Archived is orthogonal
+  // to stage: the Archived view shows only archived records; the active and
+  // closed views exclude archived entirely.
   const stageMatched = deals.filter((d) => {
+    if (mode === 'archived') return Boolean(d.archived);
+    if (d.archived) return false;
     if (mode === 'pipeline' && d.stage === 'closed') return false;
     if (mode === 'closed' && d.stage !== 'closed') return false;
     return true;
@@ -318,7 +324,7 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   if (sorted.length === 0) {
     return (
       <>
-        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
+        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={bannerScope} />
         <div className="empty-state">
           {isSearching && hiddenBySearch > 0 ? (
             <>
@@ -329,6 +335,11 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
             <>
               <p>No clients fit this filter.</p>
               <p>Loosen the team filter, or hit "+ Add Client" to start one.</p>
+            </>
+          ) : mode === 'archived' ? (
+            <>
+              <p>Nothing archived.</p>
+              <p>Archive a stalled client from their record to set it aside without deleting.</p>
             </>
           ) : (
             <>
@@ -343,7 +354,7 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
 
   return (
     <>
-      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
+      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={bannerScope} />
 
       <div className="deals-cards-mobile">
         {sorted.map((deal) => (
