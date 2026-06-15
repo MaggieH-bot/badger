@@ -11,6 +11,7 @@ import { Shell } from './components/layout/Shell';
 import { TodayView } from './components/views/TodayView';
 import { PipelineView } from './components/views/PipelineView';
 import { ClosedTransactionsView } from './components/views/ClosedTransactionsView';
+import { ArchivedView } from './components/views/ArchivedView';
 import { ImportView } from './components/views/ImportView';
 import { WorkspaceView } from './components/views/WorkspaceView';
 import { DealForm } from './components/deals/DealForm';
@@ -90,6 +91,9 @@ function AppContent() {
           {route === '#/pipeline' && <PipelineView onSelectDeal={handleSelectDeal} />}
           {route === '#/closed' && (
             <ClosedTransactionsView onSelectDeal={handleSelectDeal} />
+          )}
+          {route === '#/archived' && (
+            <ArchivedView onSelectDeal={handleSelectDeal} />
           )}
           {route === '#/import' && <ImportView />}
           {route === '#/workspace' && <WorkspaceView />}

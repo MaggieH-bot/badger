@@ -46,6 +46,22 @@ export async function deleteDealRow(dealId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function archiveDealRow(dealId: string): Promise<void> {
+  const { error } = await supabase
+    .from('deals')
+    .update({ archived: true, archived_at: new Date().toISOString() })
+    .eq('id', dealId);
+  if (error) throw error;
+}
+
+export async function unarchiveDealRow(dealId: string): Promise<void> {
+  const { error } = await supabase
+    .from('deals')
+    .update({ archived: false, archived_at: null })
+    .eq('id', dealId);
+  if (error) throw error;
+}
+
 export async function updateDealLastContact(
   dealId: string,
   isoTimestamp: string,

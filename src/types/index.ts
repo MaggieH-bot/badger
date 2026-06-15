@@ -144,6 +144,11 @@ export interface Deal {
   blocker?: string;
   leadSource?: string;
 
+  // Archive — orthogonal to stage/category. Archived records are set aside
+  // (out of Today / Pipeline / insights) without being deleted; reversible.
+  archived?: boolean;   // false or undefined when active
+  archivedAt?: string;  // ISO 8601, OR undefined when active
+
   // Timestamps
   lastContact?: string; // ISO 8601, OR undefined when never logged
   createdAt: string; // ISO 8601
@@ -172,7 +177,7 @@ export interface PipelineStore {
 
 export type TeamFilter = Assignee | 'All';
 
-export type AppRoute = '#/' | '#/pipeline' | '#/closed' | '#/import' | '#/workspace';
+export type AppRoute = '#/' | '#/pipeline' | '#/closed' | '#/archived' | '#/import' | '#/workspace';
 
 export type PipelineViewMode = 'table' | 'board';
 

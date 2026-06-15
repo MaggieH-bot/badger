@@ -212,8 +212,8 @@ export function TodayView({ onSelectDeal }: TodayViewProps) {
   const { members } = useWorkspaceMembers();
   const [chip, setChip] = useState<TodayChip>('all');
 
-  // Active deals only; closed records are excluded entirely.
-  const activeDeals = deals.filter((d) => d.stage !== 'closed');
+  // Active deals only; closed and archived records are excluded entirely.
+  const activeDeals = deals.filter((d) => d.stage !== 'closed' && !d.archived);
 
   const filtered = activeDeals.filter(
     (d) =>

@@ -155,6 +155,23 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
     onClose();
   }
 
+  // Archive sets a stalled record aside (out of Today / Pipeline / insights)
+  // without deleting it; Restore returns it. Reversible either way.
+  function handleArchiveToggle() {
+    if (!deal) return;
+    if (deal.archived) {
+      dispatch({ type: 'UNARCHIVE_DEAL', dealId: deal.id });
+      onClose();
+      return;
+    }
+    const ok = window.confirm(
+      `Archive ${deal.clientName}? They'll drop out of Today, Pipeline, and Badger's nudges — but stay in your Archived list, restorable anytime.`,
+    );
+    if (!ok) return;
+    dispatch({ type: 'ARCHIVE_DEAL', dealId: deal.id });
+    onClose();
+  }
+
   function jumpToSection(key: SectionKey) {
     setActiveSection(key);
     const el = mainRef.current?.querySelector(`#section-${key}`);
@@ -318,6 +335,33 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
               onRequestSave={handleSaveAll}
             />
             <DocumentsTab key={`${deal.id}-docs`} deal={deal} />
+
+            <section className="record-section">
+              <h3 className="record-section-title">
+                {deal.archived ? 'Restore' : 'Archive'}
+              </h3>
+              <div className="danger-zone-row">
+                <div className="danger-zone-copy">
+                  <p className="danger-zone-heading">
+                    {deal.archived
+                      ? 'Restore this client'
+                      : 'Archive this client'}
+                  </p>
+                  <p className="danger-zone-detail">
+                    {deal.archived
+                      ? 'Bring them back into your active pipeline and Today list.'
+                      : 'Set them aside without deleting — hidden from Today, Pipeline, and Badger nudges, kept in Archived.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={handleArchiveToggle}
+                >
+                  {deal.archived ? 'Restore Client' : 'Archive Client'}
+                </button>
+              </div>
+            </section>
 
             <section className="record-section danger-zone">
               <h3 className="record-section-title">Danger zone</h3>
