@@ -41,6 +41,14 @@ export function PrepareChecklistButton({ deal }: { deal: Deal }) {
         '../../utils/documentTemplates/prelistingChecklistPdf'
       );
       const file = buildPrelistingChecklistPdf(deal, displayName);
+
+      // Open the draft immediately so the agent sees the result and can review
+      // it (drafts only — this is review, not sending). It's also saved to
+      // Documents below. Object URL is revoked after the tab has had time to load.
+      const previewUrl = URL.createObjectURL(file);
+      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30000);
+
       const { path } = await uploadDocumentFile(
         file,
         workspace.id,
@@ -66,7 +74,7 @@ export function PrepareChecklistButton({ deal }: { deal: Deal }) {
         },
       });
 
-      setFlash('Added to Documents — review before sending.');
+      setFlash('Opened for review and saved to Documents.');
       window.setTimeout(() => setFlash(null), 4000);
     } catch (err) {
       console.error('[badger] prepare pre-listing checklist failed:', err);
