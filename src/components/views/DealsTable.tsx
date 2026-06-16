@@ -338,8 +338,8 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
             </>
           ) : mode === 'archived' ? (
             <>
-              <p>Nothing archived.</p>
-              <p>Archive a stalled client from their record to set it aside without deleting.</p>
+              <p>Nothing set aside yet.</p>
+              <p>Archive a stalled client from their record to park it here — no delete required.</p>
             </>
           ) : (
             <>

@@ -480,8 +480,8 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
         <section id="section-more-info" className="record-section">
           <h3 className="record-section-title">More Info</h3>
           <p className="record-section-hint">
-            Structured context — timeframe, area, motivation, blockers, lead source,
-            and short comments. Saved with the rest of the client record via Save Changes.
+            The context that makes Badger sharper — timeframe, area, motivation,
+            blockers, lead source. Saved with the record when you hit Save Changes.
           </p>
           <MoreInfoForm ref={moreInfoRef} deal={deal} onRequestSave={onRequestSave} />
         </section>
@@ -489,8 +489,8 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
         <section id="section-activity" className="record-section">
           <h3 className="record-section-title">Activity</h3>
           <p className="record-section-hint">
-            Records a touch with the client (call, text, email, meeting). Updates
-            the last-contact date and removes them from First Touch.
+            Log a real touch — call, text, email, meeting. It resets the
+            last-contact clock and clears them off First Touch.
           </p>
           <LogActivityForm deal={deal} />
           {logEntries.length === 0 ? (
@@ -516,9 +516,8 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
         <section id="section-notes" className="record-section">
           <h3 className="record-section-title">Notes</h3>
           <p className="record-section-hint">
-            Freeform observations for your own reference. <strong>Does not</strong>{' '}
-            count as a contact — clients with notes but no logged activity stay in
-            First Touch.
+            Your own scratchpad. <strong>Doesn't</strong>{' '}
+            count as a touch — a note alone won't move a client off First Touch.
           </p>
           <AddNoteForm dealId={deal.id} />
           {deal.notes.length === 0 ? (

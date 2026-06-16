@@ -381,8 +381,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
           </div>
           {markedDone && (
             <p className="next-step-done-hint" role="status">
-              Done. Add the next step before saving, or save blank to move this
-              client to Needs Step.
+              Nice — that's done. Line up the next step before you save, or save
+              it blank to drop them into Needs Step.
             </p>
           )}
         </div>
@@ -474,7 +474,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
 
         {!showAddress && !showListPrice && !showPriceRange && !showClosedPrice && (
           <p className="record-section-hint">
-            Set an Opportunity Type and Stage to enter property and price details.
+            Set an Opportunity Type and Stage first — Badger will surface the
+            price fields that actually fit.
           </p>
         )}
 

@@ -506,8 +506,8 @@ export function DocumentsTab({ deal }: DocumentsTabProps) {
     <section id="section-documents" className="record-section">
       <h3 className="record-section-title">Documents</h3>
       <p className="record-section-hint">
-        Attach a PDF (up to 25 MB) or write notes — both are optional, but at
-        least one is required. Files open via a short-lived secure link.
+        Attach a PDF (up to 25 MB), jot notes, or both — just give Badger one of
+        them. Files open through a short-lived secure link.
       </p>
       <AddDocumentForm dealId={deal.id} />
       {deal.documents.length === 0 ? (
