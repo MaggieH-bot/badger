@@ -54,6 +54,9 @@ export interface DealRow {
   archived: boolean;
   archived_at: string | null;
 
+  // Both-sided link — ties a buy deal and a sell deal together (15W-70)
+  linked_deal_id: string | null;
+
   created_at: string;
   updated_at: string;
   created_by: string | null;

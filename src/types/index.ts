@@ -149,6 +149,10 @@ export interface Deal {
   archived?: boolean;   // false or undefined when active
   archivedAt?: string;  // ISO 8601, OR undefined when active
 
+  // Both-sided link: the id of the paired deal (the other side of a client
+  // who is both buying and selling). Undefined for single-sided clients. 15W-70
+  linkedDealId?: string;
+
   // Timestamps
   lastContact?: string; // ISO 8601, OR undefined when never logged
   createdAt: string; // ISO 8601

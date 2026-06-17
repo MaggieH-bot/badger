@@ -90,6 +90,7 @@ export function rowToDeal(row: DealRowWithChildren): Deal {
     leadSource: row.lead_source ?? undefined,
     archived: row.archived ?? undefined,
     archivedAt: row.archived_at ?? undefined,
+    linkedDealId: row.linked_deal_id ?? undefined,
     lastContact,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -146,6 +147,7 @@ export function dealToInsertRow(
     lead_source: deal.leadSource ?? null,
     archived: deal.archived ?? false,
     archived_at: deal.archivedAt ?? null,
+    linked_deal_id: deal.linkedDealId ?? null,
     last_contact: deal.lastContact ?? null,
     created_by: userId,
   };
@@ -178,6 +180,7 @@ export function dealToUpdateRow(deal: Deal): DealUpdateRow {
     lead_source: deal.leadSource ?? null,
     archived: deal.archived ?? false,
     archived_at: deal.archivedAt ?? null,
+    linked_deal_id: deal.linkedDealId ?? null,
     last_contact: deal.lastContact ?? null,
   };
 }

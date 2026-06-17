@@ -6,6 +6,8 @@ import {
   deleteDealRow,
   archiveDealRow,
   unarchiveDealRow,
+  linkDeals,
+  unlinkDeal,
   updateDealLastContact,
 } from './deals';
 import { addContactLogEntry } from './contactLog';
@@ -49,6 +51,14 @@ export async function persistAction(
 
     case 'UNARCHIVE_DEAL':
       await unarchiveDealRow(action.dealId);
+      return;
+
+    case 'LINK_DEALS':
+      await linkDeals(action.dealIdA, action.dealIdB);
+      return;
+
+    case 'UNLINK_DEAL':
+      await unlinkDeal(action.dealId);
       return;
 
     case 'ADD_CONTACT_LOG':
