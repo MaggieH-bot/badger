@@ -169,9 +169,9 @@ const CLOSED_INSIGHT: BadgerInsight = {
 
 const ARCHIVED_INSIGHT: BadgerInsight = {
   priority: 'low',
-  headline: 'Archived — set aside for now.',
+  headline: 'In the Den — set aside for now.',
   reason: "It's out of your active pipeline. Nothing here needs you.",
-  suggestedTouch: 'Restore it from the Archive section if this one heats back up.',
+  suggestedTouch: 'Bring it back from the Den if this one heats back up.',
   suggestedValueAdd: '',
 };
 

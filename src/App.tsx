@@ -92,7 +92,7 @@ function AppContent() {
           {route === '#/closed' && (
             <ClosedTransactionsView onSelectDeal={handleSelectDeal} />
           )}
-          {route === '#/archived' && (
+          {route === '#/den' && (
             <ArchivedView onSelectDeal={handleSelectDeal} />
           )}
           {route === '#/import' && <ImportView />}
