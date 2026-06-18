@@ -4,6 +4,19 @@ This file is the runbook for working on Badger safely. Read it once before
 your first change; refer back to it whenever you set up a new machine, write
 a migration, or promote a change to production.
 
+## Keeping this runbook current (read first)
+
+This doc is the source of truth for the Badger workflow. Two standing rules
+keep it from going stale:
+
+1. **Change the process → update this doc in the same pass.** Any change to the
+   workflow, branch model, deploy/migration process, or environment wiring must
+   update the relevant section of this runbook (or the matching source-of-truth
+   doc) as part of the *same* change — never as a follow-up.
+2. **Conflict → flag before proceeding.** If this runbook conflicts with a
+   current instruction, stop and surface the conflict rather than silently
+   following the stale doc. Resolve which is right, then update the doc to match.
+
 ## Two-tier model
 
 | Tier | Branch | Vercel target | Supabase project |
