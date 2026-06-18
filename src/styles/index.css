@@ -3051,31 +3051,33 @@ body {
   color: var(--text-secondary);
 }
 
-/* 15W-70: linked-deal banner (top of drawer) + split-side action buttons. */
-.linked-banner {
+/* 15W-70: linked-deal strip — one home for linkage state, pinned under the
+   Badger card and above the record body. Also the split-side action buttons. */
+.linked-strip {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin: 14px var(--space-lg) 0;
+  margin: 0 var(--space-lg) 14px;
   padding: 8px 12px;
   background: var(--accent-muted);
   border: 1px solid rgba(95, 161, 216, 0.32);
   border-radius: var(--radius-md);
 }
 
-.linked-banner-text {
+.linked-strip-text {
   font-size: 13px;
+  line-height: 1.4;
   color: var(--text-secondary);
 }
 
-.linked-banner-text strong {
+.linked-strip-text strong {
   color: var(--text-primary);
   font-weight: 600;
 }
 
-.linked-banner-glyph {
+.linked-strip-glyph {
   color: var(--accent);
   font-weight: 700;
 }
@@ -3085,6 +3087,7 @@ body {
   flex-wrap: wrap;
   gap: var(--space-sm);
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* Prefilled "Add the other side" form — note under the heading. */
