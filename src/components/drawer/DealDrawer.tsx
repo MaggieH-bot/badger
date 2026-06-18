@@ -287,6 +287,11 @@ export function DealDrawer({
           <div className="workspace-header-info">
             <div className="workspace-title-row">
               <h2 className="workspace-title">{deal.clientName}</h2>
+              {deal.linkedDealId && deal.opportunityType && (
+                <span className="status-badge status-badge--side">
+                  {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]} side
+                </span>
+              )}
               {isClosed && (
                 <span className="status-badge status-badge--closed">Closed</span>
               )}
@@ -358,7 +363,10 @@ export function DealDrawer({
               className="btn btn--secondary btn--nav"
               onClick={() => leaveFor(() => onSelectDeal(linkedDeal.id))}
             >
-              View
+              View{' '}
+              {linkedDeal.opportunityType
+                ? `${OPPORTUNITY_TYPE_LABELS[linkedDeal.opportunityType].toLowerCase()} side`
+                : 'other side'}
             </button>
           </div>
         )}

@@ -1565,6 +1565,13 @@ body {
   border: 1px solid var(--border-strong);
 }
 
+/* 15W-70: marks which side of a linked pair this record is, by the name. */
+.status-badge--side {
+  background: var(--accent-muted);
+  color: var(--accent);
+  border: 1px solid rgba(95, 161, 216, 0.32);
+}
+
 /* --- Attention pill (secondary follow-up signal) --- */
 
 .attention-pill {
