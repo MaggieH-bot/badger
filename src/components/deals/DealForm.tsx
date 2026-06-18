@@ -538,7 +538,7 @@ export function DealForm({ onClose, prefill, linkToDealId }: DealFormProps) {
             Cancel
           </button>
           <button type="submit" className="btn btn--primary">
-            Create Client
+            {isLinking ? `Add the ${linkingSideLabel}` : 'Create Client'}
           </button>
         </div>
       </form>

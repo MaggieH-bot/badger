@@ -313,32 +313,6 @@ export function DealDrawer({
           </button>
         </header>
 
-        {linkedDeal && (
-          <div className="linked-banner">
-            <span className="linked-banner-text">
-              <span className="linked-banner-glyph" aria-hidden="true">↔</span>{' '}
-              Linked to the{' '}
-              <strong>
-                {linkedDeal.opportunityType
-                  ? OPPORTUNITY_TYPE_LABELS[linkedDeal.opportunityType].toLowerCase()
-                  : 'other'}{' '}
-                side
-              </strong>
-              {linkedDeal.stage !== 'closed' && (
-                <> · {STAGE_LABELS[linkedDeal.stage]}</>
-              )}
-              {linkedDeal.stage === 'closed' && <> · Closed</>}
-            </span>
-            <button
-              type="button"
-              className="btn btn--secondary btn--nav"
-              onClick={() => leaveFor(() => onSelectDeal(linkedDeal.id))}
-            >
-              View
-            </button>
-          </div>
-        )}
-
         <div className="badger-card">
           <span className="badger-card-avatar">
             <BadgerAvatar size={22} title="Badger" />
@@ -367,6 +341,104 @@ export function DealDrawer({
             <PrepareChecklistButton deal={deal} />
           </div>
         </div>
+
+        {/* 15W-70 Phase 1: one home for the deal's linkage state, pinned at the
+            top by the structure/status fields. Linked / single-sided / legacy
+            Both are mutually exclusive, so at most one strip renders. */}
+        {linkedDeal && (
+          <div className="linked-strip">
+            <span className="linked-strip-text">
+              <span className="linked-strip-glyph" aria-hidden="true">↔</span>{' '}
+              Linked to the{' '}
+              <strong>
+                {linkedDeal.opportunityType
+                  ? OPPORTUNITY_TYPE_LABELS[linkedDeal.opportunityType].toLowerCase()
+                  : 'other'}{' '}
+                side
+              </strong>
+              {' · '}
+              {linkedDeal.stage === 'closed'
+                ? 'Closed'
+                : STAGE_LABELS[linkedDeal.stage]}
+            </span>
+            <button
+              type="button"
+              className="btn btn--secondary btn--nav"
+              onClick={() => leaveFor(() => onSelectDeal(linkedDeal.id))}
+            >
+              View
+            </button>
+          </div>
+        )}
+
+        {canAddOtherSide && (
+          <div className="linked-strip">
+            <span className="linked-strip-text">
+              <span className="linked-strip-glyph" aria-hidden="true">↔</span>{' '}
+              {deal.opportunityType === 'buy' ? 'Buying' : 'Selling'} only — is{' '}
+              {deal.clientName} also{' '}
+              {deal.opportunityType === 'buy' ? 'selling' : 'buying'}?
+            </span>
+            <button
+              type="button"
+              className="btn btn--secondary btn--nav"
+              onClick={() => leaveFor(() => onAddOtherSide(deal))}
+            >
+              Add the {deal.opportunityType === 'buy' ? 'sell' : 'buy'} side
+            </button>
+          </div>
+        )}
+
+        {canSplitBoth && (
+          <div className="linked-strip">
+            {!splitting ? (
+              <>
+                <span className="linked-strip-text">
+                  <span className="linked-strip-glyph" aria-hidden="true">↔</span>{' '}
+                  Buying and selling on one record. Split into two linked sides,
+                  each with its own stage and nudges?
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--nav"
+                  onClick={() => setSplitting(true)}
+                >
+                  Split into buy + sell
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="linked-strip-text">
+                  Which side is <strong>this</strong> record? It keeps its history;
+                  the other side is created fresh and linked.
+                </span>
+                <div className="linked-split-actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--nav"
+                    onClick={() => leaveFor(() => onSplitBoth(deal, 'sell'))}
+                  >
+                    Sell side
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--nav"
+                    onClick={() => leaveFor(() => onSplitBoth(deal, 'buy'))}
+                  >
+                    Buy side
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--nav"
+                    onClick={() => setSplitting(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="workspace-body">
           <nav className="workspace-nav" aria-label="Client record sections">
@@ -400,93 +472,6 @@ export function DealDrawer({
               onRequestSave={handleSaveAll}
             />
             <DocumentsTab key={`${deal.id}-docs`} deal={deal} />
-
-            {canAddOtherSide && (
-              <section className="record-section">
-                <h3 className="record-section-title">The other side</h3>
-                <div className="danger-zone-row">
-                  <div className="danger-zone-copy">
-                    <p className="danger-zone-heading">Add the other side</p>
-                    <p className="danger-zone-detail">
-                      {deal.clientName} also{' '}
-                      {deal.opportunityType === 'buy' ? 'selling' : 'buying'}? Spin
-                      up the linked{' '}
-                      {deal.opportunityType === 'buy' ? 'sell' : 'buy'} side — it
-                      tracks its own stage and nudges, joined to this one.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={() => leaveFor(() => onAddOtherSide(deal))}
-                  >
-                    Add the other side
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {canSplitBoth && (
-              <section className="record-section">
-                <h3 className="record-section-title">Split into buy + sell</h3>
-                {!splitting ? (
-                  <div className="danger-zone-row">
-                    <div className="danger-zone-copy">
-                      <p className="danger-zone-heading">
-                        This is a Both client on one record
-                      </p>
-                      <p className="danger-zone-detail">
-                        Split it into a linked buy side and sell side, each with
-                        its own stage and nudges. This record keeps all its
-                        history as the side you pick.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn--secondary"
-                      onClick={() => setSplitting(true)}
-                    >
-                      Split into buy + sell
-                    </button>
-                  </div>
-                ) : (
-                  <div className="danger-zone-row">
-                    <div className="danger-zone-copy">
-                      <p className="danger-zone-heading">
-                        Which side is this record?
-                      </p>
-                      <p className="danger-zone-detail">
-                        It keeps its history as the side you pick; the other side
-                        is created fresh and linked.
-                      </p>
-                    </div>
-                    <div className="linked-split-actions">
-                      <button
-                        type="button"
-                        className="btn btn--secondary"
-                        onClick={() => leaveFor(() => onSplitBoth(deal, 'sell'))}
-                      >
-                        This is the sell side
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--secondary"
-                        onClick={() => leaveFor(() => onSplitBoth(deal, 'buy'))}
-                      >
-                        This is the buy side
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost"
-                        onClick={() => setSplitting(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
 
             <section className="record-section">
               <h3 className="record-section-title">The Den</h3>
