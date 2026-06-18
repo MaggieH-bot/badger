@@ -30,6 +30,11 @@ import {
 interface DetailsTabProps {
   deal: Deal;
   onRequestSave: () => void;
+  // 15W-70: linkage actions live by the Opportunity Type field, revealed once
+  // the agent engages that field. Both navigate away (drawer guards unsaved
+  // edits before invoking these).
+  onAddOtherSide: (deal: Deal) => void;
+  onSplitBoth: (deal: Deal, thisSide: 'buy' | 'sell') => void;
 }
 
 // Imperative handle the drawer uses to drive the unified Save Changes flow.
@@ -93,11 +98,21 @@ function initForm(deal: Deal) {
 }
 
 export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
-  function DetailsTab({ deal, onRequestSave }, ref) {
+  function DetailsTab({ deal, onRequestSave, onAddOtherSide, onSplitBoth }, ref) {
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
+  // 15W-70: linkage affordances stay hidden until the agent engages the
+  // Opportunity Type field — keeps plain single-sided records uncluttered.
+  const [typeEngaged, setTypeEngaged] = useState(false);
+  const [splitting, setSplitting] = useState(false);
+  // Eligibility keys off the SAVED record (its established structure), not the
+  // in-progress form edits, so the affordance doesn't flip while typing.
+  const canAddOtherSide =
+    !deal.linkedDealId &&
+    (deal.opportunityType === 'buy' || deal.opportunityType === 'sell');
+  const canSplitBoth = !deal.linkedDealId && deal.opportunityType === 'both';
   // Tracks whether the user has typed in any field since the last save. Used
   // by the drawer footer to decide whether the X needs to confirm discard.
   const userTouchedRef = useRef(false);
@@ -285,6 +300,7 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             <select
               id="dt-opportunityType"
               value={form.opportunityType}
+              onFocus={() => setTypeEngaged(true)}
               onChange={(e) =>
                 handleChange('opportunityType', e.target.value as OpportunityType | '')
               }
@@ -312,6 +328,71 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             </select>
           </div>
         </div>
+
+        {typeEngaged && canAddOtherSide && (
+          <div className="linked-inline">
+            <span className="linked-inline-text">
+              Buying and selling? Track the other side as its own linked record.
+            </span>
+            <button
+              type="button"
+              className="btn btn--secondary btn--nav"
+              onClick={() => onAddOtherSide(deal)}
+            >
+              Add the {deal.opportunityType === 'buy' ? 'sell' : 'buy'} side
+            </button>
+          </div>
+        )}
+
+        {typeEngaged && canSplitBoth && (
+          <div className="linked-inline">
+            {!splitting ? (
+              <>
+                <span className="linked-inline-text">
+                  One record for both sides — split it into a linked buy and sell,
+                  each with its own stage and nudges.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--nav"
+                  onClick={() => setSplitting(true)}
+                >
+                  Split into buy + sell
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="linked-inline-text">
+                  Which side is this record? It keeps its history; the other side
+                  is created fresh and linked.
+                </span>
+                <div className="linked-split-actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--nav"
+                    onClick={() => onSplitBoth(deal, 'sell')}
+                  >
+                    Sell side
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--nav"
+                    onClick={() => onSplitBoth(deal, 'buy')}
+                  >
+                    Buy side
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--nav"
+                    onClick={() => setSplitting(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="form-row">
           <div className="form-field">

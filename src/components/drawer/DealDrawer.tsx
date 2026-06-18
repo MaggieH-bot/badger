@@ -77,8 +77,6 @@ export function DealDrawer({
   const { members } = useWorkspaceMembers();
   const [activeSection, setActiveSection] = useState<SectionKey>('overview');
   const [savedFlash, setSavedFlash] = useState(false);
-  // Drives the "which side is this?" picker for the Split action.
-  const [splitting, setSplitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<DetailsTabHandle>(null);
@@ -281,12 +279,6 @@ export function DealDrawer({
   const linkedDeal = deal.linkedDealId
     ? deals.find((d) => d.id === deal.linkedDealId)
     : undefined;
-  // "Add the other side" is offered on an unlinked single-sided record.
-  const canAddOtherSide =
-    !deal.linkedDealId &&
-    (deal.opportunityType === 'buy' || deal.opportunityType === 'sell');
-  // "Split into buy + sell" is offered on a legacy Both record not yet split.
-  const canSplitBoth = !deal.linkedDealId && deal.opportunityType === 'both';
 
   return (
     <div className="workspace-overlay">
@@ -342,9 +334,9 @@ export function DealDrawer({
           </div>
         </div>
 
-        {/* 15W-70 Phase 1: one home for the deal's linkage state, pinned at the
-            top by the structure/status fields. Linked / single-sided / legacy
-            Both are mutually exclusive, so at most one strip renders. */}
+        {/* 15W-70 Phase 1: linked status pinned at the top — the one linkage
+            state worth always showing, with a jump to the other record. The
+            add-other-side / split actions live inline by Opportunity Type. */}
         {linkedDeal && (
           <div className="linked-strip">
             <span className="linked-strip-text">
@@ -368,75 +360,6 @@ export function DealDrawer({
             >
               View
             </button>
-          </div>
-        )}
-
-        {canAddOtherSide && (
-          <div className="linked-strip">
-            <span className="linked-strip-text">
-              <span className="linked-strip-glyph" aria-hidden="true">↔</span>{' '}
-              {deal.opportunityType === 'buy' ? 'Buying' : 'Selling'} only — is{' '}
-              {deal.clientName} also{' '}
-              {deal.opportunityType === 'buy' ? 'selling' : 'buying'}?
-            </span>
-            <button
-              type="button"
-              className="btn btn--secondary btn--nav"
-              onClick={() => leaveFor(() => onAddOtherSide(deal))}
-            >
-              Add the {deal.opportunityType === 'buy' ? 'sell' : 'buy'} side
-            </button>
-          </div>
-        )}
-
-        {canSplitBoth && (
-          <div className="linked-strip">
-            {!splitting ? (
-              <>
-                <span className="linked-strip-text">
-                  <span className="linked-strip-glyph" aria-hidden="true">↔</span>{' '}
-                  Buying and selling on one record. Split into two linked sides,
-                  each with its own stage and nudges?
-                </span>
-                <button
-                  type="button"
-                  className="btn btn--secondary btn--nav"
-                  onClick={() => setSplitting(true)}
-                >
-                  Split into buy + sell
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="linked-strip-text">
-                  Which side is <strong>this</strong> record? It keeps its history;
-                  the other side is created fresh and linked.
-                </span>
-                <div className="linked-split-actions">
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--nav"
-                    onClick={() => leaveFor(() => onSplitBoth(deal, 'sell'))}
-                  >
-                    Sell side
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--nav"
-                    onClick={() => leaveFor(() => onSplitBoth(deal, 'buy'))}
-                  >
-                    Buy side
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--nav"
-                    onClick={() => setSplitting(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         )}
 
@@ -464,6 +387,8 @@ export function DealDrawer({
               ref={detailsRef}
               deal={deal}
               onRequestSave={handleSaveAll}
+              onAddOtherSide={(d) => leaveFor(() => onAddOtherSide(d))}
+              onSplitBoth={(d, side) => leaveFor(() => onSplitBoth(d, side))}
             />
             <ActivityTab
               key={`${deal.id}-activity`}
