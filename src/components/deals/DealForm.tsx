@@ -158,6 +158,10 @@ export function DealForm({ onClose, prefill, linkToDealId }: DealFormProps) {
         clientName: trimmedName,
         category,
         opportunityType: typeOrUndef,
+        // Stamp the link at INSERT time when creating a linked side, so the
+        // new row's link can't be lost to a create-vs-link write race (the
+        // separate LINK_DEALS below still links the existing side).
+        linkedDealId: linkToDealId,
         probability: parsedProbability,
         comments: comments.trim() || undefined,
         stage,

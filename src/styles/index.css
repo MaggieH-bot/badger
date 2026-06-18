@@ -3090,6 +3090,26 @@ body {
   flex-shrink: 0;
 }
 
+/* 15W-70: inline linkage affordance, tucked under the Opportunity Type field
+   and revealed only once the agent engages that field. */
+.linked-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin: calc(-1 * var(--space-sm)) 0 var(--space-md);
+  padding: 8px 12px;
+  background: var(--accent-muted);
+  border: 1px solid rgba(95, 161, 216, 0.32);
+  border-radius: var(--radius-md);
+}
+
+.linked-inline-text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
 /* Prefilled "Add the other side" form — note under the heading. */
 .form-link-note {
   margin: -4px 0 var(--space-md);
