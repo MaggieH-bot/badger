@@ -103,8 +103,9 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
   const { members } = useWorkspaceMembers();
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
-  // 15W-70: linkage affordances stay hidden until the agent engages the
-  // Opportunity Type field — keeps plain single-sided records uncluttered.
+  // 15W-70: "add the other side" on a single-sided record stays hidden until
+  // the agent engages the Opportunity Type field — keeps plain buy/sell records
+  // uncluttered. (Split on a Both record is always shown — see below.)
   const [typeEngaged, setTypeEngaged] = useState(false);
   const [splitting, setSplitting] = useState(false);
   // Eligibility keys off the SAVED record (its established structure), not the
@@ -344,7 +345,10 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
           </div>
         )}
 
-        {typeEngaged && canSplitBoth && (
+        {/* A Both record is the one state that needs resolving, so its Split
+            action is always visible — not gated behind engaging the type field
+            (unlike "add the other side" on single-sided records). */}
+        {canSplitBoth && (
           <div className="linked-inline">
             {!splitting ? (
               <>
