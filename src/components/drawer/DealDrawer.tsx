@@ -43,6 +43,13 @@ interface DealDrawerProps {
   // Used when a Today row opens the workspace, so the user lands on the
   // editable Next Step / Due Date pair and the Mark Complete affordance.
   initialFocus?: 'next-step';
+  // Jump to another record (the linked other side). Parent swaps the open deal.
+  onSelectDeal: (dealId: string) => void;
+  // Open the Add Client form prefilled to create + link this deal's other side.
+  onAddOtherSide: (deal: Deal) => void;
+  // Split a legacy 'both' record: this record becomes `thisSide` (keeps its
+  // history), the opposite side is created and linked.
+  onSplitBoth: (deal: Deal, thisSide: 'buy' | 'sell') => void;
 }
 
 function formatLastUpdated(iso: string): string {
@@ -56,13 +63,22 @@ function formatLastUpdated(iso: string): string {
   });
 }
 
-export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
+export function DealDrawer({
+  dealId,
+  onClose,
+  initialFocus,
+  onSelectDeal,
+  onAddOtherSide,
+  onSplitBoth,
+}: DealDrawerProps) {
   const { deals, dispatch } = useDeals();
   const { user } = useAuth();
   const { preferences } = useUIPreferences();
   const { members } = useWorkspaceMembers();
   const [activeSection, setActiveSection] = useState<SectionKey>('overview');
   const [savedFlash, setSavedFlash] = useState(false);
+  // Drives the "which side is this?" picker for the Split action.
+  const [splitting, setSplitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<DetailsTabHandle>(null);
@@ -90,6 +106,16 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
       if (!ok) return;
     }
     onClose();
+  }
+
+  // Navigating away from the current record (jump to linked side, add/split a
+  // side) leaves any unsaved edits behind — guard with the same discard prompt.
+  function leaveFor(action: () => void) {
+    if (isAnyDirty()) {
+      const ok = window.confirm('Toss your unsaved changes?');
+      if (!ok) return;
+    }
+    action();
   }
 
   // Unified save: validate Details, merge Details + More Info patches into a
@@ -249,6 +275,19 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   // as a top-of-record banner below the header so it frames the whole record.
   const insight = computeInsight(computeUrgency(deal));
 
+  // --- Linked-deal (15W-70 Phase 1) ---
+  // The partner side, if this deal is linked. May be undefined if the partner
+  // was deleted (DB nulls the link) before this render catches up.
+  const linkedDeal = deal.linkedDealId
+    ? deals.find((d) => d.id === deal.linkedDealId)
+    : undefined;
+  // "Add the other side" is offered on an unlinked single-sided record.
+  const canAddOtherSide =
+    !deal.linkedDealId &&
+    (deal.opportunityType === 'buy' || deal.opportunityType === 'sell');
+  // "Split into buy + sell" is offered on a legacy Both record not yet split.
+  const canSplitBoth = !deal.linkedDealId && deal.opportunityType === 'both';
+
   return (
     <div className="workspace-overlay">
       <div className="workspace-modal" ref={modalRef}>
@@ -273,6 +312,32 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
             &times;
           </button>
         </header>
+
+        {linkedDeal && (
+          <div className="linked-banner">
+            <span className="linked-banner-text">
+              <span className="linked-banner-glyph" aria-hidden="true">↔</span>{' '}
+              Linked to the{' '}
+              <strong>
+                {linkedDeal.opportunityType
+                  ? OPPORTUNITY_TYPE_LABELS[linkedDeal.opportunityType].toLowerCase()
+                  : 'other'}{' '}
+                side
+              </strong>
+              {linkedDeal.stage !== 'closed' && (
+                <> · {STAGE_LABELS[linkedDeal.stage]}</>
+              )}
+              {linkedDeal.stage === 'closed' && <> · Closed</>}
+            </span>
+            <button
+              type="button"
+              className="btn btn--secondary btn--nav"
+              onClick={() => leaveFor(() => onSelectDeal(linkedDeal.id))}
+            >
+              View
+            </button>
+          </div>
+        )}
 
         <div className="badger-card">
           <span className="badger-card-avatar">
@@ -335,6 +400,93 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
               onRequestSave={handleSaveAll}
             />
             <DocumentsTab key={`${deal.id}-docs`} deal={deal} />
+
+            {canAddOtherSide && (
+              <section className="record-section">
+                <h3 className="record-section-title">The other side</h3>
+                <div className="danger-zone-row">
+                  <div className="danger-zone-copy">
+                    <p className="danger-zone-heading">Add the other side</p>
+                    <p className="danger-zone-detail">
+                      {deal.clientName} also{' '}
+                      {deal.opportunityType === 'buy' ? 'selling' : 'buying'}? Spin
+                      up the linked{' '}
+                      {deal.opportunityType === 'buy' ? 'sell' : 'buy'} side — it
+                      tracks its own stage and nudges, joined to this one.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => leaveFor(() => onAddOtherSide(deal))}
+                  >
+                    Add the other side
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {canSplitBoth && (
+              <section className="record-section">
+                <h3 className="record-section-title">Split into buy + sell</h3>
+                {!splitting ? (
+                  <div className="danger-zone-row">
+                    <div className="danger-zone-copy">
+                      <p className="danger-zone-heading">
+                        This is a Both client on one record
+                      </p>
+                      <p className="danger-zone-detail">
+                        Split it into a linked buy side and sell side, each with
+                        its own stage and nudges. This record keeps all its
+                        history as the side you pick.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => setSplitting(true)}
+                    >
+                      Split into buy + sell
+                    </button>
+                  </div>
+                ) : (
+                  <div className="danger-zone-row">
+                    <div className="danger-zone-copy">
+                      <p className="danger-zone-heading">
+                        Which side is this record?
+                      </p>
+                      <p className="danger-zone-detail">
+                        It keeps its history as the side you pick; the other side
+                        is created fresh and linked.
+                      </p>
+                    </div>
+                    <div className="linked-split-actions">
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => leaveFor(() => onSplitBoth(deal, 'sell'))}
+                      >
+                        This is the sell side
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--secondary"
+                        onClick={() => leaveFor(() => onSplitBoth(deal, 'buy'))}
+                      >
+                        This is the buy side
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost"
+                        onClick={() => setSplitting(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="record-section">
               <h3 className="record-section-title">The Den</h3>

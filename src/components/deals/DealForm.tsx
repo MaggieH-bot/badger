@@ -24,8 +24,27 @@ import {
   shouldShowClosedPrice,
 } from './fieldVisibility';
 
+// Shared-contact fields carried over when spinning up the linked other side
+// (15W-70 Phase 1). Side-specific fields (stage, prices) are intentionally
+// NOT prefilled — the new side starts its own lifecycle.
+export interface DealFormPrefill {
+  clientName?: string;
+  opportunityType?: OpportunityType;
+  category?: Category;
+  assignedTo?: string;
+  phone?: string;
+  email?: string;
+  areaOfInterest?: string;
+  leadSource?: string;
+}
+
 interface DealFormProps {
   onClose: () => void;
+  // When set, the form is creating the second side of a linked pair: it opens
+  // prefilled and, on save, dispatches LINK_DEALS to pair the new deal with
+  // this id.
+  prefill?: DealFormPrefill;
+  linkToDealId?: string;
 }
 
 function parseProbability(input: string): number | undefined {
@@ -45,26 +64,30 @@ function parseNumber(input: string): number | undefined {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
-export function DealForm({ onClose }: DealFormProps) {
+export function DealForm({ onClose, prefill, linkToDealId }: DealFormProps) {
   const { dispatch } = useDeals();
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
   const currentUserId = user?.id ?? null;
   const assigneeOptions = buildAssigneeOptions(members, currentUserId);
 
-  const [clientName, setClientName] = useState('');
-  const [category, setCategory] = useState<Category>('nurture');
-  const [opportunityType, setOpportunityType] = useState<OpportunityType | ''>('');
+  const [clientName, setClientName] = useState(prefill?.clientName ?? '');
+  const [category, setCategory] = useState<Category>(prefill?.category ?? 'nurture');
+  const [opportunityType, setOpportunityType] = useState<OpportunityType | ''>(
+    prefill?.opportunityType ?? '',
+  );
   const [probability, setProbability] = useState('');
   const [stage, setStage] = useState<Stage>('lead');
   // Default to the current user so new clients are assigned to whoever is
   // creating them. Falls back to Unassigned if user.id isn't available yet.
-  const [assignedTo, setAssignedTo] = useState<string>(currentUserId ?? '');
+  const [assignedTo, setAssignedTo] = useState<string>(
+    prefill?.assignedTo ?? currentUserId ?? '',
+  );
   const [nextStep, setNextStep] = useState('');
   const [nextStepDue, setNextStepDue] = useState('');
   const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(prefill?.phone ?? '');
+  const [email, setEmail] = useState(prefill?.email ?? '');
   const [listPrice, setListPrice] = useState('');
   const [priceRangeLow, setPriceRangeLow] = useState('');
   const [priceRangeHigh, setPriceRangeHigh] = useState('');
@@ -72,11 +95,15 @@ export function DealForm({ onClose }: DealFormProps) {
   const [sequencing, setSequencing] = useState<Sequencing | ''>('');
   const [comments, setComments] = useState('');
   const [targetTimeframe, setTargetTimeframe] = useState('');
-  const [areaOfInterest, setAreaOfInterest] = useState('');
+  const [areaOfInterest, setAreaOfInterest] = useState(prefill?.areaOfInterest ?? '');
   const [motivation, setMotivation] = useState('');
   const [blocker, setBlocker] = useState('');
-  const [leadSource, setLeadSource] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [leadSource, setLeadSource] = useState(prefill?.leadSource ?? '');
+  // Open "More context" up front when prefilled context fields carried over,
+  // so the agent can see what came across from the other side.
+  const [moreOpen, setMoreOpen] = useState(
+    Boolean(prefill?.areaOfInterest || prefill?.leadSource),
+  );
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
 
   const typeOrUndef: OpportunityType | undefined = opportunityType || undefined;
@@ -122,11 +149,12 @@ export function DealForm({ onClose }: DealFormProps) {
 
     const now = new Date().toISOString();
     const dueIso = nextStepDue.trim() ? new Date(nextStepDue).toISOString() : undefined;
+    const newDealId = generateId();
 
     dispatch({
       type: 'ADD_DEAL',
       deal: {
-        id: generateId(),
+        id: newDealId,
         clientName: trimmedName,
         category,
         opportunityType: typeOrUndef,
@@ -158,12 +186,30 @@ export function DealForm({ onClose }: DealFormProps) {
       },
     });
 
+    // Pair the new deal with its other side (Add the other side / Split flows).
+    if (linkToDealId) {
+      dispatch({ type: 'LINK_DEALS', dealIdA: newDealId, dealIdB: linkToDealId });
+    }
+
     onClose();
   }
 
+  const isLinking = Boolean(linkToDealId);
+  const linkingSideLabel =
+    typeOrUndef === 'buy' || typeOrUndef === 'sell'
+      ? `${OPPORTUNITY_TYPE_LABELS[typeOrUndef].toLowerCase()} side`
+      : 'other side';
+
   return (
     <div className="deal-form-container">
-      <h2>Add Client</h2>
+      <h2>{isLinking ? `Add the ${linkingSideLabel}` : 'Add Client'}</h2>
+      {isLinking && (
+        <p className="form-link-note">
+          This becomes {clientName.trim() || 'the client'}'s {linkingSideLabel} and
+          links to the side you started from. Shared contact info carried over —
+          fill in the {linkingSideLabel}'s own stage, price, and next step.
+        </p>
+      )}
       <form className="deal-form" onSubmit={handleSubmit}>
         <h3 className="form-group-title">Identity & Pipeline</h3>
 
