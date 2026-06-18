@@ -509,8 +509,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
           >
             <strong>This client is buying and selling.</strong>{' '}
             {form.sequencing
-              ? 'Badger is coaching the lane you picked — work it here and keep the other side in Notes.'
-              : 'Let Badger know which comes first — buying or selling — so it can point you at the right next move. Work that lane here and keep the other side in Notes.'}
+              ? 'Badger is coaching the lane you picked. Track the other side as its own linked record.'
+              : 'Let Badger know which comes first — buying or selling — so it can point you at the right next move. Track the other side as its own linked record.'}
           </div>
         )}
 
