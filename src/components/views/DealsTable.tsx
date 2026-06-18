@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, Fragment, type ReactNode } from 'react';
 import type { DealWithUrgency, Category } from '../../types';
 import { STAGE_LABELS, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
@@ -212,6 +212,9 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   const [sortDir, setSortDir] = useState<SortDir>(
     isClosed ? 'desc' : 'asc',
   );
+  // 15W-70 Phase 2: which linked-pair groups are expanded (desktop pipeline
+  // table only). Keyed by a stable pair key; default collapsed.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Mode filter — used to compute filter-hidden count. Archived is orthogonal
   // to stage: the Archived view shows only archived records; the active and
@@ -247,6 +250,60 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(withUrgency), sortKey, sortDir],
   );
+
+  // 15W-70 Phase 2: collapse linked buy/sell pairs into one parent row — but
+  // ONLY in the desktop pipeline table, and ONLY when both sides survive the
+  // current filter/search (so a pair sorts to its first side's slot). If only
+  // one side is in view, it renders as a normal single row. Other modes never
+  // group.
+  type RowEntry =
+    | { kind: 'single'; deal: DealWithUrgency }
+    | { kind: 'group'; key: string; sides: DealWithUrgency[] };
+
+  const rowEntries = useMemo<RowEntry[]>(() => {
+    if (mode !== 'pipeline') {
+      return sorted.map((deal) => ({ kind: 'single' as const, deal }));
+    }
+    const inView = new Set(sorted.map((d) => d.id));
+    const consumed = new Set<string>();
+    const entries: RowEntry[] = [];
+    for (const deal of sorted) {
+      if (consumed.has(deal.id)) continue;
+      const partnerId = deal.linkedDealId;
+      if (partnerId && inView.has(partnerId) && !consumed.has(partnerId)) {
+        const partner = sorted.find((d) => d.id === partnerId)!;
+        consumed.add(deal.id);
+        consumed.add(partnerId);
+        entries.push({
+          kind: 'group',
+          key: [deal.id, partnerId].sort().join('|'),
+          sides: [deal, partner],
+        });
+      } else {
+        entries.push({ kind: 'single', deal });
+      }
+    }
+    return entries;
+  }, [sorted, mode]);
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  // Collapsed parent summary, e.g. "Sell: Listing · Buy: Lead".
+  function sideSummary(sides: DealWithUrgency[]): string {
+    return sides
+      .map(
+        (s) =>
+          `${s.opportunityType ? OPPORTUNITY_TYPE_LABELS[s.opportunityType] : '—'}: ${STAGE_LABELS[s.stage]}`,
+      )
+      .join(' · ');
+  }
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -321,6 +378,88 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     return base;
   };
 
+  // A normal data row — used for standalone deals and for the expanded
+  // sub-rows of a linked pair. Sub-rows swap the client-name cell for the
+  // side label (the parent already carries the name) and indent.
+  const renderDataRow = (deal: DealWithUrgency, isSub = false): ReactNode => (
+    <tr
+      key={deal.id}
+      className={`deals-table-row${isSub ? ' deals-table-row--sub' : ''}`}
+      onClick={() => onSelectDeal(deal.id)}
+    >
+      {columns.map((col) => (
+        <td
+          key={col.key}
+          className={`${cellClassFor(col.key)}${
+            isSub && col.key === 'clientName' ? ' deals-table-td--sub-name' : ''
+          }`}
+        >
+          {isSub && col.key === 'clientName' ? (
+            <span className="deals-table-sub-label">
+              ↳{' '}
+              {deal.opportunityType
+                ? `${OPPORTUNITY_TYPE_LABELS[deal.opportunityType]} side`
+                : 'Side'}
+            </span>
+          ) : (
+            renderCell(deal, col.key)
+          )}
+        </td>
+      ))}
+    </tr>
+  );
+
+  // The collapsed parent of a linked pair: a container row (chevron + name +
+  // "Both" pill + per-side stage summary). Clicking toggles expand only — it
+  // never opens a record. Expanding reveals the two sub-rows.
+  const renderGroupRows = (
+    key: string,
+    sides: DealWithUrgency[],
+  ): ReactNode => {
+    const isOpen = expandedGroups.has(key);
+    const client = sides[0].clientName;
+    return (
+      <Fragment key={key}>
+        <tr
+          className="deals-table-row deals-table-row--group"
+          onClick={() => toggleGroup(key)}
+          aria-expanded={isOpen}
+        >
+          {columns.map((col) => {
+            if (col.key === 'clientName') {
+              return (
+                <td key={col.key} className={cellClassFor(col.key)}>
+                  <span className="deals-table-chevron" aria-hidden="true">
+                    {isOpen ? '▾' : '▸'}
+                  </span>{' '}
+                  {client}
+                </td>
+              );
+            }
+            if (col.key === 'opportunityType') {
+              return (
+                <td key={col.key} className={cellClassFor(col.key)}>
+                  <span className="opp-type-pill opp-type-pill--both">Both</span>
+                </td>
+              );
+            }
+            if (col.key === 'stage') {
+              return (
+                <td key={col.key} className={cellClassFor(col.key)}>
+                  <span className="deals-table-group-summary">
+                    {sideSummary(sides)}
+                  </span>
+                </td>
+              );
+            }
+            return <td key={col.key} className={cellClassFor(col.key)} />;
+          })}
+        </tr>
+        {isOpen && sides.map((side) => renderDataRow(side, true))}
+      </Fragment>
+    );
+  };
+
   if (sorted.length === 0) {
     return (
       <>
@@ -378,19 +517,11 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
             </tr>
           </thead>
           <tbody>
-            {sorted.map((deal) => (
-              <tr
-                key={deal.id}
-                className="deals-table-row"
-                onClick={() => onSelectDeal(deal.id)}
-              >
-                {columns.map((col) => (
-                  <td key={col.key} className={cellClassFor(col.key)}>
-                    {renderCell(deal, col.key)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rowEntries.map((entry) =>
+              entry.kind === 'group'
+                ? renderGroupRows(entry.key, entry.sides)
+                : renderDataRow(entry.deal),
+            )}
           </tbody>
         </table>
       </div>

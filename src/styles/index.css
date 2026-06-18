@@ -1786,6 +1786,39 @@ body {
   font-style: italic;
 }
 
+/* 15W-70 Phase 2: grouped linked-pair rows (desktop pipeline table only). */
+.deals-table-chevron {
+  display: inline-block;
+  width: 0.85em;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.deals-table-group-summary {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Sub-rows sit under their parent: distinct inset background (specificity
+   above the :nth-child zebra rule) and an indented side label. */
+.deals-table-row.deals-table-row--sub {
+  background: var(--bg-inset);
+}
+
+.deals-table-row.deals-table-row--sub:hover {
+  background: var(--bg-hover);
+}
+
+.deals-table-td--sub-name {
+  padding-left: calc(var(--space-md) + var(--space-lg));
+}
+
+.deals-table-sub-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-style: italic;
+}
+
 /* ============================================
    Deal Drawer
    ============================================ */
