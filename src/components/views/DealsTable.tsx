@@ -265,12 +265,23 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
       return sorted.map((deal) => ({ kind: 'single' as const, deal }));
     }
     const inView = new Set(sorted.map((d) => d.id));
+    // Treat the link as symmetric: if EITHER side references the other (and both
+    // are in view), they form one pair. This both prevents a pair from rendering
+    // as a standalone row AND a grouped child, and keeps grouping robust to a
+    // legacy one-directional link (sell→buy with the buy back-link missing).
+    const partnerOf = new Map<string, string>();
+    for (const d of sorted) {
+      if (d.linkedDealId && inView.has(d.linkedDealId)) {
+        partnerOf.set(d.id, d.linkedDealId);
+        partnerOf.set(d.linkedDealId, d.id);
+      }
+    }
     const consumed = new Set<string>();
     const entries: RowEntry[] = [];
     for (const deal of sorted) {
       if (consumed.has(deal.id)) continue;
-      const partnerId = deal.linkedDealId;
-      if (partnerId && inView.has(partnerId) && !consumed.has(partnerId)) {
+      const partnerId = partnerOf.get(deal.id);
+      if (partnerId && !consumed.has(partnerId)) {
         const partner = sorted.find((d) => d.id === partnerId)!;
         consumed.add(deal.id);
         consumed.add(partnerId);
@@ -280,6 +291,9 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
           sides: [deal, partner],
         });
       } else {
+        // Mark singles consumed too, so a partner processed later can never
+        // re-pull an already-emitted row into a group.
+        consumed.add(deal.id);
         entries.push({ kind: 'single', deal });
       }
     }
