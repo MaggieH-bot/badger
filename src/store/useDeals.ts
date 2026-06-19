@@ -21,6 +21,10 @@ type DealsAction =
   | { type: 'ADD_DEALS'; deals: Deal[] }
   | { type: 'UPDATE_DEAL'; deal: Deal }
   | { type: 'DELETE_DEAL'; dealId: string }
+  | { type: 'ARCHIVE_DEAL'; dealId: string }
+  | { type: 'UNARCHIVE_DEAL'; dealId: string }
+  | { type: 'LINK_DEALS'; dealIdA: string; dealIdB: string }
+  | { type: 'UNLINK_DEAL'; dealId: string }
   | { type: 'ADD_CONTACT_LOG'; dealId: string; entry: ContactLogEntry }
   | { type: 'ADD_NOTE'; dealId: string; note: Note }
   | { type: 'UPDATE_NOTE'; dealId: string; note: Note }
@@ -60,6 +64,42 @@ function dealsReducer(state: Deal[], action: DealsAction): Deal[] {
 
     case 'DELETE_DEAL':
       return state.filter((d) => d.id !== action.dealId);
+
+    case 'ARCHIVE_DEAL':
+      return updateDealInList(state, action.dealId, (deal) => ({
+        ...deal,
+        archived: true,
+        archivedAt: now,
+        updatedAt: now,
+      }));
+
+    case 'UNARCHIVE_DEAL':
+      return updateDealInList(state, action.dealId, (deal) => ({
+        ...deal,
+        archived: false,
+        archivedAt: undefined,
+        updatedAt: now,
+      }));
+
+    case 'LINK_DEALS':
+      // Pair the two sides — each points at the other.
+      return state.map((d) => {
+        if (d.id === action.dealIdA)
+          return { ...d, linkedDealId: action.dealIdB, updatedAt: now };
+        if (d.id === action.dealIdB)
+          return { ...d, linkedDealId: action.dealIdA, updatedAt: now };
+        return d;
+      });
+
+    case 'UNLINK_DEAL': {
+      // Clear the link on the deal and on whichever side points back at it.
+      const partnerId = state.find((d) => d.id === action.dealId)?.linkedDealId;
+      return state.map((d) => {
+        if (d.id === action.dealId || d.id === partnerId)
+          return { ...d, linkedDealId: undefined, updatedAt: now };
+        return d;
+      });
+    }
 
     case 'ADD_CONTACT_LOG':
       return updateDealInList(state, action.dealId, (deal) => ({

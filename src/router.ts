@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import type { AppRoute } from './types';
 import { useUIPreferences } from './store/useUIPreferences';
 
-const VALID_ROUTES: AppRoute[] = ['#/', '#/pipeline', '#/closed', '#/import', '#/workspace'];
+const VALID_ROUTES: AppRoute[] = ['#/', '#/pipeline', '#/closed', '#/den', '#/import', '#/workspace'];
 
 // Legacy route map: old hash → new hash
 const ROUTE_MIGRATIONS: Record<string, AppRoute> = {
   '#/deals': '#/pipeline',
+  '#/archived': '#/den',
 };
 
 function isValidRoute(hash: string): hash is AppRoute {

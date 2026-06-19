@@ -15,6 +15,7 @@ const NAV_ITEMS: { route: AppRoute; label: string }[] = [
   { route: '#/', label: 'Today' },
   { route: '#/pipeline', label: 'Pipeline' },
   { route: '#/closed', label: 'Closed Transactions' },
+  { route: '#/den', label: 'The Den' },
 ];
 
 interface FilterOption {

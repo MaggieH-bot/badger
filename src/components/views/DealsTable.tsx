@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, Fragment, type ReactNode } from 'react';
 import type { DealWithUrgency, Category } from '../../types';
 import { STAGE_LABELS, CATEGORY_LABELS, OPPORTUNITY_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
@@ -11,7 +11,7 @@ import { DealCard } from '../deals/DealCard';
 import { matchesSearch } from '../../utils/search';
 import { formatPriceRange } from '../../utils/priceRange';
 
-export type DealsTableMode = 'pipeline' | 'closed';
+export type DealsTableMode = 'pipeline' | 'closed' | 'archived';
 
 interface DealsTableProps {
   mode: DealsTableMode;
@@ -201,6 +201,8 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   const { members } = useWorkspaceMembers();
   const isClosed = mode === 'closed';
   const columns = isClosed ? CLOSED_COLUMNS : PIPELINE_COLUMNS;
+  const bannerScope =
+    mode === 'pipeline' ? 'active' : mode === 'closed' ? 'closed' : 'archived';
 
   // Default sort: pipeline goes by client last name A–Z; closed keeps the
   // prior Last-Contact-desc behavior.
@@ -210,9 +212,16 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
   const [sortDir, setSortDir] = useState<SortDir>(
     isClosed ? 'desc' : 'asc',
   );
+  // 15W-70 Phase 2: which linked-pair groups are expanded (desktop pipeline
+  // table only). Keyed by a stable pair key; default collapsed.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  // Stage filter by mode (active vs closed) — used to compute filter-hidden count
+  // Mode filter — used to compute filter-hidden count. Archived is orthogonal
+  // to stage: the Archived view shows only archived records; the active and
+  // closed views exclude archived entirely.
   const stageMatched = deals.filter((d) => {
+    if (mode === 'archived') return Boolean(d.archived);
+    if (d.archived) return false;
     if (mode === 'pipeline' && d.stage === 'closed') return false;
     if (mode === 'closed' && d.stage !== 'closed') return false;
     return true;
@@ -241,6 +250,64 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(withUrgency), sortKey, sortDir],
   );
+
+  // 15W-70 Phase 2: collapse linked buy/sell pairs into one parent row — but
+  // ONLY in the desktop pipeline table, and ONLY when both sides survive the
+  // current filter/search (so a pair sorts to its first side's slot). If only
+  // one side is in view, it renders as a normal single row. Other modes never
+  // group.
+  type RowEntry =
+    | { kind: 'single'; deal: DealWithUrgency }
+    | { kind: 'group'; key: string; sides: DealWithUrgency[] };
+
+  const rowEntries = useMemo<RowEntry[]>(() => {
+    if (mode !== 'pipeline') {
+      return sorted.map((deal) => ({ kind: 'single' as const, deal }));
+    }
+    const inView = new Set(sorted.map((d) => d.id));
+    // Treat the link as symmetric: if EITHER side references the other (and both
+    // are in view), they form one pair. This both prevents a pair from rendering
+    // as a standalone row AND a grouped child, and keeps grouping robust to a
+    // legacy one-directional link (sell→buy with the buy back-link missing).
+    const partnerOf = new Map<string, string>();
+    for (const d of sorted) {
+      if (d.linkedDealId && inView.has(d.linkedDealId)) {
+        partnerOf.set(d.id, d.linkedDealId);
+        partnerOf.set(d.linkedDealId, d.id);
+      }
+    }
+    const consumed = new Set<string>();
+    const entries: RowEntry[] = [];
+    for (const deal of sorted) {
+      if (consumed.has(deal.id)) continue;
+      const partnerId = partnerOf.get(deal.id);
+      if (partnerId && !consumed.has(partnerId)) {
+        const partner = sorted.find((d) => d.id === partnerId)!;
+        consumed.add(deal.id);
+        consumed.add(partnerId);
+        entries.push({
+          kind: 'group',
+          key: [deal.id, partnerId].sort().join('|'),
+          sides: [deal, partner],
+        });
+      } else {
+        // Mark singles consumed too, so a partner processed later can never
+        // re-pull an already-emitted row into a group.
+        consumed.add(deal.id);
+        entries.push({ kind: 'single', deal });
+      }
+    }
+    return entries;
+  }, [sorted, mode]);
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -315,25 +382,160 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     return base;
   };
 
+  // A normal data row — used for standalone deals and for the expanded
+  // sub-rows of a linked pair. Sub-rows swap the client-name cell for the
+  // side label (the parent already carries the name) and indent.
+  const renderDataRow = (deal: DealWithUrgency, isSub = false): ReactNode => (
+    <tr
+      key={deal.id}
+      className={`deals-table-row${isSub ? ' deals-table-row--sub' : ''}`}
+      onClick={() => onSelectDeal(deal.id)}
+    >
+      {columns.map((col) => (
+        <td
+          key={col.key}
+          className={`${cellClassFor(col.key)}${
+            isSub && col.key === 'clientName' ? ' deals-table-td--sub-name' : ''
+          }`}
+        >
+          {isSub && col.key === 'clientName' ? (
+            <span className="deals-table-sub-label">
+              ↳{' '}
+              {deal.opportunityType
+                ? `${OPPORTUNITY_TYPE_LABELS[deal.opportunityType]} side`
+                : 'Side'}
+            </span>
+          ) : (
+            renderCell(deal, col.key)
+          )}
+        </td>
+      ))}
+    </tr>
+  );
+
+  // The collapsed parent of a linked pair: a container row (chevron + name +
+  // "Both" pill + per-side stage summary). Clicking toggles expand only — it
+  // never opens a record. Expanding reveals the two sub-rows.
+  const renderGroupRows = (
+    key: string,
+    sides: DealWithUrgency[],
+  ): ReactNode => {
+    const isOpen = expandedGroups.has(key);
+    const client = sides[0].clientName;
+    return (
+      <Fragment key={key}>
+        <tr
+          className="deals-table-row deals-table-row--group"
+          onClick={() => toggleGroup(key)}
+          aria-expanded={isOpen}
+        >
+          {columns.map((col) => {
+            if (col.key === 'clientName') {
+              return (
+                <td key={col.key} className={cellClassFor(col.key)}>
+                  <span className="deals-table-chevron" aria-hidden="true">
+                    {isOpen ? '▾' : '▸'}
+                  </span>{' '}
+                  {client}
+                </td>
+              );
+            }
+            if (col.key === 'opportunityType') {
+              return (
+                <td key={col.key} className={cellClassFor(col.key)}>
+                  <span className="opp-type-pill opp-type-pill--both">Both</span>
+                </td>
+              );
+            }
+            if (col.key === 'stage') {
+              return (
+                <td key={col.key} className={cellClassFor(col.key)}>
+                  <span className="deals-table-group-summary">
+                    {sides.map((s) => (
+                      <span key={s.id} className="deals-table-group-summary-line">
+                        {s.opportunityType
+                          ? OPPORTUNITY_TYPE_LABELS[s.opportunityType]
+                          : '—'}{' '}
+                        · {STAGE_LABELS[s.stage]}
+                      </span>
+                    ))}
+                  </span>
+                </td>
+              );
+            }
+            return <td key={col.key} className={cellClassFor(col.key)} />;
+          })}
+        </tr>
+        {isOpen && sides.map((side) => renderDataRow(side, true))}
+      </Fragment>
+    );
+  };
+
+  // Narrow/tablet/mobile equivalent of a grouped row: one client card with the
+  // two tappable sides inside it, so a linked pair reads as one client (not two
+  // duplicate cards). Each side opens its own record.
+  const renderGroupCard = (key: string, sides: DealWithUrgency[]): ReactNode => (
+    <div key={key} className="deal-card deal-card--group">
+      <div className="deal-card-header">
+        <span className="deal-card-name">{sides[0].clientName}</span>
+        <span className="opp-type-pill opp-type-pill--both">Both</span>
+      </div>
+      <div className="deal-card-sides">
+        {sides.map((side) => (
+          <button
+            key={side.id}
+            type="button"
+            className="deal-card-side"
+            onClick={() => onSelectDeal(side.id)}
+          >
+            <span className="deal-card-side-head">
+              <span
+                className={`opp-type-pill opp-type-pill--${side.opportunityType ?? 'both'}`}
+              >
+                {side.opportunityType
+                  ? `${OPPORTUNITY_TYPE_LABELS[side.opportunityType]} side`
+                  : 'Side'}
+              </span>
+              <span className="deal-card-side-stage">{STAGE_LABELS[side.stage]}</span>
+            </span>
+            {side.nextStep && (
+              <span className="deal-card-side-next">
+                Next: {side.nextStep}
+                {side.nextStepDue
+                  ? ` — due ${formatDueDateShort(side.nextStepDue)}`
+                  : ''}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   if (sorted.length === 0) {
     return (
       <>
-        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
+        <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={bannerScope} />
         <div className="empty-state">
           {isSearching && hiddenBySearch > 0 ? (
             <>
-              <p>No clients found.</p>
-              <p>No match for "{searchQuery.trim()}". Clear the search to see all clients.</p>
+              <p>Nothing matches that.</p>
+              <p>No one called "{searchQuery.trim()}". Clear the search to see everyone.</p>
             </>
           ) : mode === 'pipeline' ? (
             <>
-              <p>No active clients match the current filter.</p>
-              <p>Click "+ Add Client" to create a client, or change the team filter.</p>
+              <p>No clients fit this filter.</p>
+              <p>Loosen the team filter, or hit "+ Add Client" to start one.</p>
+            </>
+          ) : mode === 'archived' ? (
+            <>
+              <p>The Den is empty.</p>
+              <p>Tuck a stalled client into the Den from their record to set it aside without deleting.</p>
             </>
           ) : (
             <>
-              <p>No closed transactions match the current filter.</p>
-              <p>Closed clients will appear here once their stage is set to Closed.</p>
+              <p>No closed deals here yet.</p>
+              <p>Wins land here the moment a client's stage flips to Closed.</p>
             </>
           )}
         </div>
@@ -343,12 +545,16 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
 
   return (
     <>
-      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={mode === 'pipeline' ? 'active' : 'closed'} />
+      <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={bannerScope} />
 
       <div className="deals-cards-mobile">
-        {sorted.map((deal) => (
-          <DealCard key={deal.id} deal={deal} onClick={onSelectDeal} />
-        ))}
+        {rowEntries.map((entry) =>
+          entry.kind === 'group' ? (
+            renderGroupCard(entry.key, entry.sides)
+          ) : (
+            <DealCard key={entry.deal.id} deal={entry.deal} onClick={onSelectDeal} />
+          ),
+        )}
       </div>
 
       <div className="table-wrap deals-table-desktop">
@@ -367,19 +573,11 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
             </tr>
           </thead>
           <tbody>
-            {sorted.map((deal) => (
-              <tr
-                key={deal.id}
-                className="deals-table-row"
-                onClick={() => onSelectDeal(deal.id)}
-              >
-                {columns.map((col) => (
-                  <td key={col.key} className={cellClassFor(col.key)}>
-                    {renderCell(deal, col.key)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rowEntries.map((entry) =>
+              entry.kind === 'group'
+                ? renderGroupRows(entry.key, entry.sides)
+                : renderDataRow(entry.deal),
+            )}
           </tbody>
         </table>
       </div>

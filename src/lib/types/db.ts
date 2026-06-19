@@ -49,6 +49,14 @@ export interface DealRow {
   lead_source: string | null;
 
   last_contact: string | null;
+
+  // Archive (orthogonal to stage/category) — 15W-69
+  archived: boolean;
+  archived_at: string | null;
+
+  // Both-sided link — ties a buy deal and a sell deal together (15W-70)
+  linked_deal_id: string | null;
+
   created_at: string;
   updated_at: string;
   created_by: string | null;

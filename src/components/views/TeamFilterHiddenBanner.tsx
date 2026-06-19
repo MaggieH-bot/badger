@@ -1,6 +1,6 @@
 import { useUIPreferences } from '../../store/useUIPreferences';
 
-type Scope = 'active' | 'closed' | 'workspace';
+type Scope = 'active' | 'closed' | 'archived' | 'workspace';
 
 interface TeamFilterHiddenBannerProps {
   hiddenCount: number;
@@ -10,6 +10,7 @@ interface TeamFilterHiddenBannerProps {
 const SCOPE_NOUN: Record<Scope, { singular: string; plural: string }> = {
   active: { singular: 'active client', plural: 'active clients' },
   closed: { singular: 'closed client', plural: 'closed clients' },
+  archived: { singular: 'client in the Den', plural: 'clients in the Den' },
   workspace: { singular: 'client', plural: 'clients' },
 };
 

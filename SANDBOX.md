@@ -4,13 +4,28 @@ This file is the runbook for working on Badger safely. Read it once before
 your first change; refer back to it whenever you set up a new machine, write
 a migration, or promote a change to production.
 
+## Keeping this runbook current (read first)
+
+This doc is the source of truth for the Badger workflow. Two standing rules
+keep it from going stale:
+
+1. **Change the process → update this doc in the same pass.** Any change to the
+   workflow, branch model, deploy/migration process, or environment wiring must
+   update the relevant section of this runbook (or the matching source-of-truth
+   doc) as part of the *same* change — never as a follow-up.
+2. **Conflict → flag before proceeding.** If this runbook conflicts with a
+   current instruction, stop and surface the conflict rather than silently
+   following the stale doc. Resolve which is right, then update the doc to match.
+
 ## Two-tier model
 
 | Tier | Branch | Vercel target | Supabase project |
 |---|---|---|---|
 | Production | `main` | Production (`badger-wheat.vercel.app`) | live Badger Supabase |
-| Pre-prod / integration | `staging` | Preview (alias `badger-git-staging-…vercel.app`) | `badger-sandbox` |
-| Feature work | `dev/<short-name>` | Preview (alias `badger-git-dev-<name>-…vercel.app`) | `badger-sandbox` |
+| Work + integration | `staging` | Preview (alias `badger-git-staging-…vercel.app`) | `badger-sandbox` |
+
+Routine work happens directly on `staging` — there is no separate feature-branch
+tier. See the Branch model and Daily workflow sections below.
 
 Production data is never touched by preview deploys. Auth, schema, RLS, and
 storage all live in the sandbox project for non-prod work.
@@ -79,52 +94,57 @@ workflow rules below still apply even without protection turned on.
 
 ## Branch model
 
-- **`main`** — production. Receives merges only from `staging`. Never commit
-  directly. Never force-push (except rollback, with explicit approval).
-- **`staging`** — long-lived integration branch. Forked from `main` at the
-  last-known-good commit. Feature branches merge here first. Gets promoted
-  to `main` via a separate PR after end-to-end review.
-- **`dev/<short-name>`** — short-lived feature branch. Always branched from
-  the latest `staging`. One narrow change per branch. Deleted after merge.
+- **`main`** — production. Receives merges only from `staging`, and only via a
+  PR after explicit approval. Never commit directly. Never force-push (except
+  rollback, with explicit approval).
+- **`staging`** — the working branch. Routine iteration is committed **directly
+  to `staging`** and tested on the staging preview. No `dev/*` feature branches
+  or PRs for normal work. Promoted to `main` only on approval.
 
-## Daily feature workflow
+## Daily workflow
+
+Work directly on `staging`:
 
 ```
 git switch staging
 git pull
-git switch -c dev/<short-name>
-# … edit, run `npm run lint` and `npm run build` locally before pushing …
-git push -u origin dev/<short-name>
+# … edit, run `npm run lint` and `npm run build` locally …
+git commit -m "…"
+git push origin staging
 ```
 
-1. Vercel auto-builds a preview against the sandbox Supabase. The branch
-   alias URL is `https://badger-git-dev-<short-name>-maggieh-bots-projects.vercel.app`.
-2. Magic-link sign-in on the preview works because the sandbox redirect URLs
-   allow `badger-git-*` patterns.
-3. Verify the change. Iterate on the same branch.
-4. When green, open a PR `dev/<short-name>` → `staging`. Review the preview
-   one last time, then merge.
-5. After staging is verified end-to-end (it has its own preview URL), open
-   a separate PR `staging` → `main`. Merge **only after explicit approval
-   per change**. Merging to `main` triggers production deploy.
+1. Vercel auto-builds the staging preview against the sandbox Supabase, at
+   `https://badger-git-staging-maggieh-bots-projects.vercel.app`.
+2. Magic-link sign-in works there because the sandbox redirect URLs allow the
+   `badger-git-*` pattern.
+3. Test on the staging preview. Iterate directly on `staging`.
 
-If a hotfix is genuinely urgent and can't go through staging, document the
-exception in the PR description and still create a PR. Never edit `main`
-directly.
+No `dev/*` branches and no PRs for routine staging work — commit straight to
+`staging`.
+
+## Promoting to production
+
+The **only** PR is `staging` → `main`, and it ships to production:
+
+1. Confirm staging is verified end-to-end on its preview.
+2. Open a PR `staging` → `main`.
+3. Merge **only after explicit approval**. Merging to `main` triggers the
+   production deploy.
+
+Never edit `main` directly. Never force-push.
 
 ## Migration runbook
 
-Migrations live in `sql/` with `YYYY-MM-DD-short-name.sql` filenames. One
-migration per dev branch when possible. All migrations are idempotent
-(`IF EXISTS` guards, `do $$ ... end$$` loops, `COMMENT ON …` overwrites).
+Migrations live in `sql/` with `YYYY-MM-DD-short-name.sql` filenames. Keep each
+migration self-contained. All migrations are idempotent (`IF EXISTS` guards,
+`do $$ ... end$$` loops, `COMMENT ON …` overwrites).
 
-1. Write the SQL on a `dev/<name>` branch in `sql/<date>-<name>.sql`.
+1. Write the SQL on `staging` in `sql/<date>-<name>.sql`.
 2. Apply to **sandbox** Supabase via its SQL Editor.
-3. Exercise the feature on the preview deploy.
-4. Merge `dev/<name>` → `staging`. Re-verify on the staging preview.
-5. Apply the same SQL to **production** Supabase via its SQL Editor.
-6. Merge `staging` → `main`. Production deploys; the schema is already in
-   place.
+3. Exercise the change on the staging preview.
+4. When promoting: apply the same SQL to **production** Supabase via its SQL
+   Editor, then open the `staging` → `main` PR and merge on approval. The schema
+   is already in place when production deploys.
 
 Rules:
 
@@ -145,8 +165,8 @@ Rules:
 - Never seed sandbox from production data. Build test fixtures manually or
   with a small script.
 - If a bug needs real-data context, take notes and reproduce in sandbox.
-  Never re-point a feature branch at production Supabase to "test against
-  real data."
+  Never re-point `staging` (or any non-prod branch) at production Supabase to
+  "test against real data."
 
 ## Rollback procedure
 
@@ -164,7 +184,8 @@ runbook before treating the rollback as complete.
 
 ## What this file replaces
 
-This file is the single source of truth for the Badger workflow. Earlier
-tribal-knowledge rules (main = production; no force-push; dev branches
-named `dev/<name>`; preview review before merge) are now codified here.
-Update this file when the workflow changes; do not let it drift.
+This file is the single source of truth for the Badger workflow. The current
+flow: work directly on `staging` (main = production; no force-push; test on the
+staging preview; promote to `main` only via an approved `staging` → `main` PR).
+This supersedes the earlier `dev/<name>`-feature-branch flow. Update this file
+when the workflow changes; do not let it drift.

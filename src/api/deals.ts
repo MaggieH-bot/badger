@@ -46,6 +46,41 @@ export async function deleteDealRow(dealId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function archiveDealRow(dealId: string): Promise<void> {
+  const { error } = await supabase
+    .from('deals')
+    .update({ archived: true, archived_at: new Date().toISOString() })
+    .eq('id', dealId);
+  if (error) throw error;
+}
+
+export async function unarchiveDealRow(dealId: string): Promise<void> {
+  const { error } = await supabase
+    .from('deals')
+    .update({ archived: false, archived_at: null })
+    .eq('id', dealId);
+  if (error) throw error;
+}
+
+// Pair two deals as the buy/sell sides of one client. Each row points at the
+// other. Two updates (Supabase has no client-side transaction); if the second
+// fails the first is harmless on its own and a retry re-links cleanly.
+export async function linkDeals(dealIdA: string, dealIdB: string): Promise<void> {
+  const a = await supabase.from('deals').update({ linked_deal_id: dealIdB }).eq('id', dealIdA);
+  if (a.error) throw a.error;
+  const b = await supabase.from('deals').update({ linked_deal_id: dealIdA }).eq('id', dealIdB);
+  if (b.error) throw b.error;
+}
+
+// Clear the link from both sides — the deal itself and whoever points at it.
+export async function unlinkDeal(dealId: string): Promise<void> {
+  const { error } = await supabase
+    .from('deals')
+    .update({ linked_deal_id: null })
+    .or(`id.eq.${dealId},linked_deal_id.eq.${dealId}`);
+  if (error) throw error;
+}
+
 export async function updateDealLastContact(
   dealId: string,
   isoTimestamp: string,

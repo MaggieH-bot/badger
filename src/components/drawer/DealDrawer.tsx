@@ -13,6 +13,7 @@ import { BadgerAvatar } from '../BadgerAvatar';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
 import { DocumentsTab } from './DocumentsTab';
+import { PrepareChecklistButton } from './PrepareChecklistButton';
 
 type SectionKey =
   | 'overview'
@@ -42,6 +43,13 @@ interface DealDrawerProps {
   // Used when a Today row opens the workspace, so the user lands on the
   // editable Next Step / Due Date pair and the Mark Complete affordance.
   initialFocus?: 'next-step';
+  // Jump to another record (the linked other side). Parent swaps the open deal.
+  onSelectDeal: (dealId: string) => void;
+  // Open the Add Client form prefilled to create + link this deal's other side.
+  onAddOtherSide: (deal: Deal) => void;
+  // Split a legacy 'both' record: this record becomes `thisSide` (keeps its
+  // history), the opposite side is created and linked.
+  onSplitBoth: (deal: Deal, thisSide: 'buy' | 'sell') => void;
 }
 
 function formatLastUpdated(iso: string): string {
@@ -55,7 +63,14 @@ function formatLastUpdated(iso: string): string {
   });
 }
 
-export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
+export function DealDrawer({
+  dealId,
+  onClose,
+  initialFocus,
+  onSelectDeal,
+  onAddOtherSide,
+  onSplitBoth,
+}: DealDrawerProps) {
   const { deals, dispatch } = useDeals();
   const { user } = useAuth();
   const { preferences } = useUIPreferences();
@@ -85,10 +100,20 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   // is already gone or filtered out).
   function requestClose() {
     if (isAnyDirty()) {
-      const ok = window.confirm('Discard unsaved changes?');
+      const ok = window.confirm('Toss your unsaved changes?');
       if (!ok) return;
     }
     onClose();
+  }
+
+  // Navigating away from the current record (jump to linked side, add/split a
+  // side) leaves any unsaved edits behind — guard with the same discard prompt.
+  function leaveFor(action: () => void) {
+    if (isAnyDirty()) {
+      const ok = window.confirm('Toss your unsaved changes?');
+      if (!ok) return;
+    }
+    action();
   }
 
   // Unified save: validate Details, merge Details + More Info patches into a
@@ -147,10 +172,27 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   function handleDelete() {
     if (!deal) return;
     const ok = window.confirm(
-      `Delete ${deal.clientName}? This removes all contact history, notes, and documents and cannot be undone.`,
+      `Delete ${deal.clientName}? Every touch, note, and document goes with them — no undo.`,
     );
     if (!ok) return;
     dispatch({ type: 'DELETE_DEAL', dealId: deal.id });
+    onClose();
+  }
+
+  // Archive sets a stalled record aside (out of Today / Pipeline / insights)
+  // without deleting it; Restore returns it. Reversible either way.
+  function handleArchiveToggle() {
+    if (!deal) return;
+    if (deal.archived) {
+      dispatch({ type: 'UNARCHIVE_DEAL', dealId: deal.id });
+      onClose();
+      return;
+    }
+    const ok = window.confirm(
+      `Move ${deal.clientName} to the Den? They'll drop out of Today, Pipeline, and Badger's nudges — but stay in the Den, restorable anytime.`,
+    );
+    if (!ok) return;
+    dispatch({ type: 'ARCHIVE_DEAL', dealId: deal.id });
     onClose();
   }
 
@@ -205,7 +247,7 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
         !modalRef.current.contains(e.target as Node)
       ) {
         if (isAnyDirty()) {
-          const ok = window.confirm('Discard unsaved changes?');
+          const ok = window.confirm('Toss your unsaved changes?');
           if (!ok) return;
         }
         onClose();
@@ -231,6 +273,13 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
   // as a top-of-record banner below the header so it frames the whole record.
   const insight = computeInsight(computeUrgency(deal));
 
+  // --- Linked-deal (15W-70 Phase 1) ---
+  // The partner side, if this deal is linked. May be undefined if the partner
+  // was deleted (DB nulls the link) before this render catches up.
+  const linkedDeal = deal.linkedDealId
+    ? deals.find((d) => d.id === deal.linkedDealId)
+    : undefined;
+
   return (
     <div className="workspace-overlay">
       <div className="workspace-modal" ref={modalRef}>
@@ -238,6 +287,11 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
           <div className="workspace-header-info">
             <div className="workspace-title-row">
               <h2 className="workspace-title">{deal.clientName}</h2>
+              {deal.linkedDealId && deal.opportunityType && (
+                <span className="status-badge status-badge--side">
+                  {OPPORTUNITY_TYPE_LABELS[deal.opportunityType]} side
+                </span>
+              )}
               {isClosed && (
                 <span className="status-badge status-badge--closed">Closed</span>
               )}
@@ -281,8 +335,41 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
             {insight.contextNote && (
               <p className="badger-card-context">{insight.contextNote}</p>
             )}
+            <PrepareChecklistButton deal={deal} />
           </div>
         </div>
+
+        {/* 15W-70 Phase 1: linked status pinned at the top — the one linkage
+            state worth always showing, with a jump to the other record. The
+            add-other-side / split actions live inline by Opportunity Type. */}
+        {linkedDeal && (
+          <div className="linked-strip">
+            <span className="linked-strip-text">
+              <span className="linked-strip-glyph" aria-hidden="true">↔</span>{' '}
+              Linked to the{' '}
+              <strong>
+                {linkedDeal.opportunityType
+                  ? OPPORTUNITY_TYPE_LABELS[linkedDeal.opportunityType].toLowerCase()
+                  : 'other'}{' '}
+                side
+              </strong>
+              {' · '}
+              {linkedDeal.stage === 'closed'
+                ? 'Closed'
+                : STAGE_LABELS[linkedDeal.stage]}
+            </span>
+            <button
+              type="button"
+              className="btn btn--secondary btn--nav"
+              onClick={() => leaveFor(() => onSelectDeal(linkedDeal.id))}
+            >
+              View{' '}
+              {linkedDeal.opportunityType
+                ? `${OPPORTUNITY_TYPE_LABELS[linkedDeal.opportunityType].toLowerCase()} side`
+                : 'other side'}
+            </button>
+          </div>
+        )}
 
         <div className="workspace-body">
           <nav className="workspace-nav" aria-label="Client record sections">
@@ -308,6 +395,8 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
               ref={detailsRef}
               deal={deal}
               onRequestSave={handleSaveAll}
+              onAddOtherSide={(d) => leaveFor(() => onAddOtherSide(d))}
+              onSplitBoth={(d, side) => leaveFor(() => onSplitBoth(d, side))}
             />
             <ActivityTab
               key={`${deal.id}-activity`}
@@ -317,14 +406,39 @@ export function DealDrawer({ dealId, onClose, initialFocus }: DealDrawerProps) {
             />
             <DocumentsTab key={`${deal.id}-docs`} deal={deal} />
 
+            <section className="record-section">
+              <h3 className="record-section-title">The Den</h3>
+              <div className="danger-zone-row">
+                <div className="danger-zone-copy">
+                  <p className="danger-zone-heading">
+                    {deal.archived
+                      ? 'Bring this client back'
+                      : 'Move this client to the Den'}
+                  </p>
+                  <p className="danger-zone-detail">
+                    {deal.archived
+                      ? 'Pull them out of the Den and back into your active pipeline and Today list.'
+                      : 'Set them aside without deleting — hidden from Today, Pipeline, and Badger nudges, kept in the Den.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={handleArchiveToggle}
+                >
+                  {deal.archived ? 'Bring Back' : 'Move to the Den'}
+                </button>
+              </div>
+            </section>
+
             <section className="record-section danger-zone">
               <h3 className="record-section-title">Danger zone</h3>
               <div className="danger-zone-row">
                 <div className="danger-zone-copy">
                   <p className="danger-zone-heading">Delete this client</p>
                   <p className="danger-zone-detail">
-                    Permanently removes {deal.clientName}, including contact
-                    history, notes, and documents.
+                    Wipes {deal.clientName} for good — every touch, note, and
+                    document goes with them.
                   </p>
                 </div>
                 <button

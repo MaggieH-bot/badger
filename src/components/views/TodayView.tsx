@@ -212,8 +212,8 @@ export function TodayView({ onSelectDeal }: TodayViewProps) {
   const { members } = useWorkspaceMembers();
   const [chip, setChip] = useState<TodayChip>('all');
 
-  // Active deals only; closed records are excluded entirely.
-  const activeDeals = deals.filter((d) => d.stage !== 'closed');
+  // Active deals only; closed and archived records are excluded entirely.
+  const activeDeals = deals.filter((d) => d.stage !== 'closed' && !d.archived);
 
   const filtered = activeDeals.filter(
     (d) =>
@@ -331,19 +331,19 @@ export function TodayView({ onSelectDeal }: TodayViewProps) {
         <div className="empty-state">
           {withUrgency.length === 0 ? (
             <>
-              <p>No active clients.</p>
-              <p>Click "+ Add Client" to create your first client.</p>
+              <p>Empty board. Nothing to dig into yet.</p>
+              <p>Hit "+ Add Client" and give Badger something to chase.</p>
             </>
           ) : (
             <>
-              <p>Nothing needs action today.</p>
-              <p>Every active client has a Next Step and Due Date in the future.</p>
+              <p>Nothing needs you today. Badger checked — twice.</p>
+              <p>Every active client has a next step with a date out ahead. Go enjoy it.</p>
             </>
           )}
         </div>
       ) : visibleRows.length === 0 ? (
         <div className="empty-state">
-          <p>No clients match this filter.</p>
+          <p>Nothing under this filter. Try another.</p>
         </div>
       ) : (
         <div className="today-list-wrap">

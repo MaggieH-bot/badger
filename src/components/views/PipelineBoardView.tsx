@@ -18,10 +18,11 @@ export function PipelineBoardView({
   const { deals } = useDeals();
   const { preferences } = useUIPreferences();
 
-  // Active pipeline only — exclude closed, then apply team filter
+  // Active pipeline only — exclude closed + archived, then apply team filter
   const filtered = deals.filter(
     (d) =>
       d.stage !== 'closed' &&
+      !d.archived &&
       (preferences.activeTeamFilter === 'All' ||
         d.assignedTo === preferences.activeTeamFilter),
   );
@@ -48,8 +49,8 @@ export function PipelineBoardView({
   if (isSearching && searchFiltered.length === 0) {
     return (
       <div className="empty-state">
-        <p>No clients found.</p>
-        <p>No match for "{searchQuery.trim()}". Clear the search to see all clients.</p>
+        <p>Nothing matches that.</p>
+        <p>No one called "{searchQuery.trim()}". Clear the search to see everyone.</p>
       </div>
     );
   }

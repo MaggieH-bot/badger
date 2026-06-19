@@ -62,7 +62,7 @@ function LogActivityForm({ deal }: { deal: Deal }) {
     e.preventDefault();
     const trimmed = summary.trim();
     if (!trimmed) {
-      setError('Summary is required.');
+      setError('Jot down what happened first.');
       return;
     }
 
@@ -87,8 +87,8 @@ function LogActivityForm({ deal }: { deal: Deal }) {
     setError('');
     setFlash(
       wasFirstTouch
-        ? 'Activity logged. Client moved out of First Touch.'
-        : 'Activity logged.',
+        ? "Touch logged — they're off the First Touch list. Nice."
+        : 'Touch logged. Clock reset.',
     );
     window.setTimeout(() => setFlash(null), 3000);
   }
@@ -292,7 +292,7 @@ function NoteEditor({
   function handleSave() {
     const trimmed = content.trim();
     if (!trimmed) {
-      setError('Note cannot be empty.');
+      setError('Empty note — give Badger something to save.');
       return;
     }
     dispatch({
@@ -348,7 +348,7 @@ function AddNoteForm({ dealId }: { dealId: string }) {
     e.preventDefault();
     const trimmed = content.trim();
     if (!trimmed) {
-      setError('Note cannot be empty.');
+      setError('Empty note — give Badger something to save.');
       return;
     }
 
@@ -427,7 +427,7 @@ function NoteItem({ dealId, note }: { dealId: string; note: NoteType }) {
   const [editing, setEditing] = useState(false);
 
   function handleDelete() {
-    if (window.confirm('Delete this note?')) {
+    if (window.confirm("Delete this note? It's gone for good.")) {
       dispatch({ type: 'DELETE_NOTE', dealId, noteId: note.id });
     }
   }
@@ -480,8 +480,8 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
         <section id="section-more-info" className="record-section">
           <h3 className="record-section-title">More Info</h3>
           <p className="record-section-hint">
-            Structured context — timeframe, area, motivation, blockers, lead source,
-            and short comments. Saved with the rest of the client record via Save Changes.
+            The context that makes Badger sharper — timeframe, area, motivation,
+            blockers, lead source. Saved with the record when you hit Save Changes.
           </p>
           <MoreInfoForm ref={moreInfoRef} deal={deal} onRequestSave={onRequestSave} />
         </section>
@@ -489,12 +489,12 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
         <section id="section-activity" className="record-section">
           <h3 className="record-section-title">Activity</h3>
           <p className="record-section-hint">
-            Records a touch with the client (call, text, email, meeting). Updates
-            the last-contact date and removes them from First Touch.
+            Log a real touch — call, text, email, meeting. It resets the
+            last-contact clock and clears them off First Touch.
           </p>
           <LogActivityForm deal={deal} />
           {logEntries.length === 0 ? (
-            <p className="empty-state empty-state--spaced">No activity logged yet.</p>
+            <p className="empty-state empty-state--spaced">No touches logged yet. Be the first.</p>
           ) : (
             <div className="log-entries">
               {logEntries.map((entry) => (
@@ -516,13 +516,12 @@ export const ActivityTab = forwardRef<ActivityTabHandle, ActivityTabProps>(
         <section id="section-notes" className="record-section">
           <h3 className="record-section-title">Notes</h3>
           <p className="record-section-hint">
-            Freeform observations for your own reference. <strong>Does not</strong>{' '}
-            count as a contact — clients with notes but no logged activity stay in
-            First Touch.
+            Your own scratchpad. <strong>Doesn't</strong>{' '}
+            count as a touch — a note alone won't move a client off First Touch.
           </p>
           <AddNoteForm dealId={deal.id} />
           {deal.notes.length === 0 ? (
-            <p className="empty-state">No notes yet.</p>
+            <p className="empty-state">No notes yet. Jot down what you don't want to forget.</p>
           ) : (
             <div className="notes-list">
               {deal.notes.map((note) => (

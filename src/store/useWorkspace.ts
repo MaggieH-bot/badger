@@ -36,7 +36,7 @@ export function useWorkspaceState(): WorkspaceContextValue {
         if (!mounted) return;
         console.error('[badger] workspace setup failed:', err);
         const message =
-          err instanceof Error ? err.message : 'Could not set up your workspace.';
+          err instanceof Error ? err.message : "Badger couldn't set up your workspace.";
         setError(message);
         setLoading(false);
       });

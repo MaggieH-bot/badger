@@ -33,16 +33,17 @@ export function LoginScreen() {
       <div className="login-card">
         <div className="login-brand">
           <span className="login-brand-name">BADGER</span>
+          <span className="login-brand-tagline">Digs up what needs your attention.</span>
         </div>
 
         {status === 'sent' ? (
           <div className="login-success">
-            <h2 className="login-heading">Check your email</h2>
+            <h2 className="login-heading">Check your inbox</h2>
             <p className="login-body">
-              We sent a magic link to <strong>{email}</strong>.
+              A magic link is on its way to <strong>{email}</strong>.
             </p>
             <p className="login-body login-body--muted">
-              Click the link to sign in. You can close this tab once you've followed it.
+              Click it to sign in. Once you have, this tab's safe to close.
             </p>
             <button
               type="button"
@@ -56,7 +57,7 @@ export function LoginScreen() {
           <form className="login-form" onSubmit={handleSubmit} noValidate>
             <h2 className="login-heading">Sign in</h2>
             <p className="login-body login-body--muted">
-              We'll email you a one-time link.
+              We'll email you a one-time sign-in link — no password to remember.
             </p>
             <div className="form-field">
               <label htmlFor="login-email">Email</label>

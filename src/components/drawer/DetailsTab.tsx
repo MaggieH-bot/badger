@@ -30,6 +30,11 @@ import {
 interface DetailsTabProps {
   deal: Deal;
   onRequestSave: () => void;
+  // 15W-70: linkage actions live by the Opportunity Type field, revealed once
+  // the agent engages that field. Both navigate away (drawer guards unsaved
+  // edits before invoking these).
+  onAddOtherSide: (deal: Deal) => void;
+  onSplitBoth: (deal: Deal, thisSide: 'buy' | 'sell') => void;
 }
 
 // Imperative handle the drawer uses to drive the unified Save Changes flow.
@@ -93,11 +98,22 @@ function initForm(deal: Deal) {
 }
 
 export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
-  function DetailsTab({ deal, onRequestSave }, ref) {
+  function DetailsTab({ deal, onRequestSave, onAddOtherSide, onSplitBoth }, ref) {
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
   const [form, setForm] = useState(() => initForm(deal));
   const [errors, setErrors] = useState<{ clientName?: string; probability?: string }>({});
+  // 15W-70: "add the other side" on a single-sided record stays hidden until
+  // the agent engages the Opportunity Type field — keeps plain buy/sell records
+  // uncluttered. (Split on a Both record is always shown — see below.)
+  const [typeEngaged, setTypeEngaged] = useState(false);
+  const [splitting, setSplitting] = useState(false);
+  // Eligibility keys off the SAVED record (its established structure), not the
+  // in-progress form edits, so the affordance doesn't flip while typing.
+  const canAddOtherSide =
+    !deal.linkedDealId &&
+    (deal.opportunityType === 'buy' || deal.opportunityType === 'sell');
+  const canSplitBoth = !deal.linkedDealId && deal.opportunityType === 'both';
   // Tracks whether the user has typed in any field since the last save. Used
   // by the drawer footer to decide whether the X needs to confirm discard.
   const userTouchedRef = useRef(false);
@@ -190,13 +206,13 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
     const trimmedName = form.clientName.trim();
     const newErrors: typeof errors = {};
 
-    if (!trimmedName) newErrors.clientName = 'Client name is required.';
+    if (!trimmedName) newErrors.clientName = 'Give this client a name first.';
 
     const probTrim = form.probability.trim();
     if (probTrim) {
       const parsed = parseProbability(probTrim);
       if (parsed === undefined) {
-        newErrors.probability = 'Probability must be an integer between 0 and 100.';
+        newErrors.probability = "Probability's a whole number from 0 to 100.";
       }
     }
 
@@ -285,6 +301,7 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             <select
               id="dt-opportunityType"
               value={form.opportunityType}
+              onFocus={() => setTypeEngaged(true)}
               onChange={(e) =>
                 handleChange('opportunityType', e.target.value as OpportunityType | '')
               }
@@ -312,6 +329,74 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
             </select>
           </div>
         </div>
+
+        {typeEngaged && canAddOtherSide && (
+          <div className="linked-inline">
+            <span className="linked-inline-text">
+              Buying and selling? Track the other side as its own linked record.
+            </span>
+            <button
+              type="button"
+              className="btn btn--secondary btn--nav"
+              onClick={() => onAddOtherSide(deal)}
+            >
+              Add the {deal.opportunityType === 'buy' ? 'sell' : 'buy'} side
+            </button>
+          </div>
+        )}
+
+        {/* A Both record is the one state that needs resolving, so its Split
+            action is always visible — not gated behind engaging the type field
+            (unlike "add the other side" on single-sided records). */}
+        {canSplitBoth && (
+          <div className="linked-inline">
+            {!splitting ? (
+              <>
+                <span className="linked-inline-text">
+                  One record for both sides — split it into a linked buy and sell,
+                  each with its own stage and nudges.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--nav"
+                  onClick={() => setSplitting(true)}
+                >
+                  Split into buy + sell
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="linked-inline-text">
+                  Which side is this record? It keeps its history; the other side
+                  is created fresh and linked.
+                </span>
+                <div className="linked-split-actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--nav"
+                    onClick={() => onSplitBoth(deal, 'sell')}
+                  >
+                    Sell side
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--nav"
+                    onClick={() => onSplitBoth(deal, 'buy')}
+                  >
+                    Buy side
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--nav"
+                    onClick={() => setSplitting(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="form-row">
           <div className="form-field">
@@ -381,8 +466,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
           </div>
           {markedDone && (
             <p className="next-step-done-hint" role="status">
-              Done. Add the next step before saving, or save blank to move this
-              client to Needs Step.
+              Nice — that's done. Line up the next step before you save, or save
+              it blank to drop them into Needs Step.
             </p>
           )}
         </div>
@@ -416,30 +501,38 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
       <section id="section-status" className="record-section">
         <h3 className="record-section-title">Status</h3>
 
-        <div className="form-field">
-          <label htmlFor="dt-probability">Probability</label>
-          <div className="form-suffix-input form-suffix-input--narrow">
-            <input
-              id="dt-probability"
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={form.probability}
-              onChange={(e) => handleChange('probability', e.target.value)}
-            />
-            <span className="form-suffix">%</span>
-          </div>
-          {errors.probability && <span className="form-error">{errors.probability}</span>}
-        </div>
-
         {showSequencing && (
-          <>
-            <div className="phase-a-both-note">
-              <strong>Both:</strong> Phase A uses a single workflow. Per-lane stage
-              and Next Step are coming in a later update — for now, fill the lane that
-              currently matters most and use Notes for the other side.
+          <div
+            className={`phase-a-both-note${
+              form.sequencing ? '' : ' phase-a-both-note--urgent'
+            }`}
+          >
+            <strong>This client is buying and selling.</strong>{' '}
+            {form.sequencing
+              ? 'Badger is coaching the lane you picked. Track the other side as its own linked record.'
+              : 'Let Badger know which comes first — buying or selling — so it can point you at the right next move. Track the other side as its own linked record.'}
+          </div>
+        )}
+
+        <div className="form-row">
+          <div className="form-field">
+            <label htmlFor="dt-probability">Probability</label>
+            <div className="form-suffix-input form-suffix-input--narrow">
+              <input
+                id="dt-probability"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={form.probability}
+                onChange={(e) => handleChange('probability', e.target.value)}
+              />
+              <span className="form-suffix">%</span>
             </div>
+            {errors.probability && <span className="form-error">{errors.probability}</span>}
+          </div>
+
+          {showSequencing && (
             <div className="form-field">
               <label htmlFor="dt-sequencing">Sequencing</label>
               <select
@@ -457,8 +550,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
                 ))}
               </select>
             </div>
-          </>
-        )}
+          )}
+        </div>
       </section>
 
       <section id="section-property-price" className="record-section">
@@ -466,7 +559,8 @@ export const DetailsTab = forwardRef<DetailsTabHandle, DetailsTabProps>(
 
         {!showAddress && !showListPrice && !showPriceRange && !showClosedPrice && (
           <p className="record-section-hint">
-            Set an Opportunity Type and Stage to enter property and price details.
+            Set an Opportunity Type and Stage first — Badger will surface the
+            price fields that actually fit.
           </p>
         )}
 
