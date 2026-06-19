@@ -309,16 +309,6 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
     });
   }
 
-  // Collapsed parent summary, e.g. "Sell: Listing · Buy: Lead".
-  function sideSummary(sides: DealWithUrgency[]): string {
-    return sides
-      .map(
-        (s) =>
-          `${s.opportunityType ? OPPORTUNITY_TYPE_LABELS[s.opportunityType] : '—'}: ${STAGE_LABELS[s.stage]}`,
-      )
-      .join(' · ');
-  }
-
   function handleSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -461,7 +451,14 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
               return (
                 <td key={col.key} className={cellClassFor(col.key)}>
                   <span className="deals-table-group-summary">
-                    {sideSummary(sides)}
+                    {sides.map((s) => (
+                      <span key={s.id} className="deals-table-group-summary-line">
+                        {s.opportunityType
+                          ? OPPORTUNITY_TYPE_LABELS[s.opportunityType]
+                          : '—'}{' '}
+                        · {STAGE_LABELS[s.stage]}
+                      </span>
+                    ))}
                   </span>
                 </td>
               );
@@ -473,6 +470,47 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
       </Fragment>
     );
   };
+
+  // Narrow/tablet/mobile equivalent of a grouped row: one client card with the
+  // two tappable sides inside it, so a linked pair reads as one client (not two
+  // duplicate cards). Each side opens its own record.
+  const renderGroupCard = (key: string, sides: DealWithUrgency[]): ReactNode => (
+    <div key={key} className="deal-card deal-card--group">
+      <div className="deal-card-header">
+        <span className="deal-card-name">{sides[0].clientName}</span>
+        <span className="opp-type-pill opp-type-pill--both">Both</span>
+      </div>
+      <div className="deal-card-sides">
+        {sides.map((side) => (
+          <button
+            key={side.id}
+            type="button"
+            className="deal-card-side"
+            onClick={() => onSelectDeal(side.id)}
+          >
+            <span className="deal-card-side-head">
+              <span
+                className={`opp-type-pill opp-type-pill--${side.opportunityType ?? 'both'}`}
+              >
+                {side.opportunityType
+                  ? `${OPPORTUNITY_TYPE_LABELS[side.opportunityType]} side`
+                  : 'Side'}
+              </span>
+              <span className="deal-card-side-stage">{STAGE_LABELS[side.stage]}</span>
+            </span>
+            {side.nextStep && (
+              <span className="deal-card-side-next">
+                Next: {side.nextStep}
+                {side.nextStepDue
+                  ? ` — due ${formatDueDateShort(side.nextStepDue)}`
+                  : ''}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   if (sorted.length === 0) {
     return (
@@ -510,9 +548,13 @@ export function DealsTable({ mode, onSelectDeal, searchQuery = '' }: DealsTableP
       <TeamFilterHiddenBanner hiddenCount={hiddenByTeamFilter} scope={bannerScope} />
 
       <div className="deals-cards-mobile">
-        {sorted.map((deal) => (
-          <DealCard key={deal.id} deal={deal} onClick={onSelectDeal} />
-        ))}
+        {rowEntries.map((entry) =>
+          entry.kind === 'group' ? (
+            renderGroupCard(entry.key, entry.sides)
+          ) : (
+            <DealCard key={entry.deal.id} deal={entry.deal} onClick={onSelectDeal} />
+          ),
+        )}
       </div>
 
       <div className="table-wrap deals-table-desktop">
