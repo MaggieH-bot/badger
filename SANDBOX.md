@@ -127,8 +127,13 @@ No `dev/*` branches and no PRs for routine staging work — commit straight to
 The **only** PR is `staging` → `main`, and it ships to production:
 
 1. Confirm staging is verified end-to-end on its preview.
-2. Open a PR `staging` → `main`.
-3. Merge **only after explicit approval**. Merging to `main` triggers the
+2. **Adversarial review:** a fresh agent session (no shared context with the
+   sessions that built the work) reviews the full `staging` → `main` diff —
+   regressions, RLS/auth holes, urgency-rule boundary cases, schema drift
+   between sandbox and prod. Findings resolved or explicitly accepted by
+   Maggie first.
+3. Open a PR `staging` → `main`.
+4. Merge **only after explicit approval**. Merging to `main` triggers the
    production deploy.
 
 Never edit `main` directly. Never force-push.
