@@ -58,6 +58,20 @@ export async function uploadDocumentFile(
 }
 
 /**
+ * Remove a just-uploaded object after its `documents` row failed to insert.
+ * Without this, a failed save leaves a file in storage that no row points at —
+ * invisible in the app and impossible to clean up from it. Best-effort: a
+ * failure here is logged, never surfaced, because the user's actual problem is
+ * the failed save, not the litter.
+ */
+export async function removeOrphanedUpload(filePath: string): Promise<void> {
+  const { error } = await supabase.storage.from(BUCKET).remove([filePath]);
+  if (error) {
+    console.warn('[badger] could not clean up orphaned upload:', filePath, error);
+  }
+}
+
+/**
  * Generate a short-lived signed URL for viewing/downloading the file.
  * 60-second expiry: long enough to open in a new tab, short enough that the
  * URL isn't reusable indefinitely.

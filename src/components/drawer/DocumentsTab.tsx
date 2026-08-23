@@ -7,7 +7,11 @@ import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { buildAssigneeOptions } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
-import { uploadDocumentFile, getDocumentSignedUrl } from '../../api/documents';
+import {
+  uploadDocumentFile,
+  getDocumentSignedUrl,
+  removeOrphanedUpload,
+} from '../../api/documents';
 
 interface DocumentsTabProps {
   deal: Deal;
@@ -36,7 +40,7 @@ function formatFileSize(bytes: number): string {
 // --- Add Document Form ---
 
 function AddDocumentForm({ dealId }: { dealId: string }) {
-  const { dispatch } = useDeals();
+  const { dispatch, dispatchAndWait } = useDeals();
   const { workspace } = useWorkspace();
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
@@ -49,7 +53,12 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState<{ title?: string; body?: string; file?: string }>({});
+  const [errors, setErrors] = useState<{
+    title?: string;
+    body?: string;
+    file?: string;
+    save?: string;
+  }>({});
   const [flash, setFlash] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -57,7 +66,7 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
     setTitle('');
     setContent('');
     setDocType('agreement');
-    setAuthor('You');
+    setAuthor(currentUserId ?? '');
     setFile(null);
     setErrors({});
     setBusy(false);
@@ -89,7 +98,13 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    if (!workspace) return;
+    if (!workspace) {
+      // Previously a silent `return`: the button did nothing and said nothing.
+      setErrors({
+        save: "Badger's still waking up — give it a second, then try again.",
+      });
+      return;
+    }
 
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
@@ -140,23 +155,44 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
       }
     }
 
-    dispatch({
-      type: 'ADD_DOCUMENT',
-      dealId,
-      document: {
-        id: documentId,
-        title: trimmedTitle,
-        type: docType,
-        author,
-        createdAt: now,
-        updatedAt: now,
-        content: trimmedContent || undefined,
-        filePath,
-        fileName,
-        fileSize,
-        fileMime,
-      },
-    });
+    // Await the insert rather than firing and forgetting. Previously this
+    // dispatched, immediately declared success and closed the form, so a failed
+    // insert left the document on screen — and gone after the next refresh.
+    try {
+      await dispatchAndWait({
+        type: 'ADD_DOCUMENT',
+        dealId,
+        document: {
+          id: documentId,
+          title: trimmedTitle,
+          type: docType,
+          author,
+          createdAt: now,
+          updatedAt: now,
+          content: trimmedContent || undefined,
+          filePath,
+          fileName,
+          fileSize,
+          fileMime,
+        },
+      });
+    } catch (err) {
+      console.error('[badger] document save failed:', err);
+      // Undo the optimistic add so the list never shows a document the
+      // database doesn't have, and bin the uploaded file so it can't become
+      // an orphan no one can see or delete.
+      dispatch({ type: '__REVERT_DOCUMENT__', dealId, documentId });
+      if (filePath) await removeOrphanedUpload(filePath);
+      // Form stays open with everything the user typed still in it.
+      setErrors({
+        save:
+          err instanceof Error
+            ? `That didn't save: ${err.message}. Nothing's lost — hit Save Document to try again.`
+            : "That didn't save. Nothing's lost — hit Save Document to try again.",
+      });
+      setBusy(false);
+      return;
+    }
 
     reset();
     setOpen(false);
@@ -260,6 +296,11 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
         />
         {errors.body && <span className="form-error">{errors.body}</span>}
       </div>
+      {errors.save && (
+        <p className="form-error form-error--block" role="alert">
+          {errors.save}
+        </p>
+      )}
       <div className="form-actions">
         <button
           type="button"
@@ -273,7 +314,7 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
           Cancel
         </button>
         <button type="submit" className="btn btn--primary" disabled={busy}>
-          {busy ? 'Uploading…' : 'Save Document'}
+          {busy ? 'Saving…' : 'Save Document'}
         </button>
       </div>
     </form>

@@ -31,7 +31,10 @@ type DealsAction =
   | { type: 'DELETE_NOTE'; dealId: string; noteId: string }
   | { type: 'ADD_DOCUMENT'; dealId: string; document: Document }
   | { type: 'UPDATE_DOCUMENT'; dealId: string; document: Document }
-  | { type: 'DELETE_DOCUMENT'; dealId: string; documentId: string; filePath?: string };
+  | { type: 'DELETE_DOCUMENT'; dealId: string; documentId: string; filePath?: string }
+  // Local-only: undo an optimistic ADD_DOCUMENT whose insert never landed.
+  // Never persisted — the row it removes was never written in the first place.
+  | { type: '__REVERT_DOCUMENT__'; dealId: string; documentId: string };
 
 // --- Reducer (in-memory only; persistence is handled by the dispatch wrapper) ---
 
@@ -154,6 +157,13 @@ function dealsReducer(state: Deal[], action: DealsAction): Deal[] {
         documents: deal.documents.filter((doc) => doc.id !== action.documentId),
         updatedAt: now,
       }));
+
+    case '__REVERT_DOCUMENT__':
+      // No updatedAt bump: this is an undo of something that never happened.
+      return updateDealInList(state, action.dealId, (deal) => ({
+        ...deal,
+        documents: deal.documents.filter((doc) => doc.id !== action.documentId),
+      }));
   }
 }
 
@@ -164,6 +174,7 @@ const WRITE_ERROR_MESSAGE = "Couldn't save changes. Refresh to sync.";
 export interface DealsContextValue {
   deals: Deal[];
   dispatch: Dispatch<DealsAction>;
+  dispatchAndWait: (action: DealsAction) => Promise<void>;
   loading: boolean;
   fetchError: string | null;
   writeError: string | null;
@@ -223,7 +234,7 @@ export function useDealsReducer(): DealsContextValue {
     (action) => {
       baseDispatch(action);
 
-      if (action.type === '__HYDRATE__') return;
+      if (action.type === '__HYDRATE__' || action.type === '__REVERT_DOCUMENT__') return;
 
       if (!workspace) {
         // Should not happen — DealsProvider only mounts after workspace resolves.
@@ -240,9 +251,29 @@ export function useDealsReducer(): DealsContextValue {
     [workspace, user],
   );
 
+  // Same optimistic-update-then-persist path as `dispatch`, but awaitable and
+  // deliberately silent about the global banner: callers use this when they
+  // report the failure themselves and undo their own optimistic state.
+  // Rejects if the write did not land.
+  const dispatchAndWait = useCallback(
+    async (action: DealsAction): Promise<void> => {
+      baseDispatch(action);
+
+      if (action.type === '__HYDRATE__' || action.type === '__REVERT_DOCUMENT__') return;
+
+      if (!workspace) {
+        throw new Error('Workspace is not ready yet.');
+      }
+
+      await persistAction(action, workspace.id, user?.id ?? null);
+    },
+    [workspace, user],
+  );
+
   return {
     deals,
     dispatch,
+    dispatchAndWait,
     loading,
     fetchError,
     writeError,

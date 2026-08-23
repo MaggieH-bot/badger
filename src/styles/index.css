@@ -428,6 +428,19 @@ body {
   font-weight: 500;
 }
 
+/* A failure the user must not miss — a save that didn't land, as opposed to
+   the inline field hints above. Sits directly above the form's buttons. */
+.form-error--block {
+  display: block;
+  margin-top: var(--space-sm);
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  line-height: 1.4;
+}
+
 .form-actions {
   display: flex;
   gap: var(--space-sm);

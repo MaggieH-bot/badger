@@ -89,5 +89,9 @@ export async function persistAction(
     case 'DELETE_DOCUMENT':
       await deleteDocument(action.documentId, action.filePath ?? null);
       return;
+
+    case '__REVERT_DOCUMENT__':
+      // Local-only undo. Nothing was written, so there is nothing to unwrite.
+      return;
   }
 }

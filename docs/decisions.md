@@ -18,3 +18,17 @@ Format:
 ## Corrections
 
 *(Date — what was wrong → what's right.)*
+
+- **2026-08-23 — Two records sharing a client name are NOT duplicates.**
+  While chasing a document-save bug I read two "Kate Stevens" rows in Closed
+  Transactions as a double-import and drafted a merge script for production.
+  Maggie: she bought *and* sold, so the two records are correct — that is
+  exactly the buy/sell pair the linked-deal model (15W-70) exists to
+  represent. Never treat same-name records as duplicates, and never propose
+  merging client records on name alone.
+
+- **2026-08-23 — Diagnose against production data before theorising.**
+  The first duplicate query was run against the sandbox project, whose test
+  data sent the investigation down a wrong path for several rounds. When a
+  bug is reported in prod, confirm which project the evidence came from
+  before drawing conclusions from it.
