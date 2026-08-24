@@ -1,4 +1,11 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 import type { Deal, Document as DocType, DocumentType } from '../../types';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
@@ -15,6 +22,17 @@ import {
 
 interface DocumentsTabProps {
   deal: Deal;
+}
+
+/**
+ * Lets the drawer see a document the user has started but not saved.
+ * Without this the drawer's unsaved-work guard was blind to the Documents
+ * section: an attached PDF sitting in an unsubmitted form was thrown away by
+ * Save Changes (or the X) with no warning, and the file was never uploaded.
+ */
+export interface DocumentsTabHandle {
+  hasPendingDocument: () => boolean;
+  flagPendingDocument: () => void;
 }
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -39,7 +57,8 @@ function formatFileSize(bytes: number): string {
 
 // --- Add Document Form ---
 
-function AddDocumentForm({ dealId }: { dealId: string }) {
+const AddDocumentForm = forwardRef<DocumentsTabHandle, { dealId: string }>(
+  function AddDocumentForm({ dealId }, ref) {
   const { dispatch, dispatchAndWait } = useDeals();
   const { workspace } = useWorkspace();
   const { user } = useAuth();
@@ -200,6 +219,23 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
     window.setTimeout(() => setFlash(null), 3000);
   }
 
+  // The drawer asks: is there work here that Save Changes would silently bin?
+  // An open form counts as pending once it holds anything worth losing.
+  useImperativeHandle(ref, () => ({
+    hasPendingDocument: () =>
+      open && (file !== null || title.trim() !== '' || content.trim() !== ''),
+    flagPendingDocument: () => {
+      const named = title.trim() !== '';
+      setErrors((prev) => ({
+        ...prev,
+        title: named ? prev.title : 'Give it a name first.',
+        save: named
+          ? "This document isn't filed yet — hit Save Document to put it away."
+          : "Name this document, then hit Save Document. Badger won't file a nameless PDF.",
+      }));
+    },
+  }));
+
   if (!open) {
     return (
       <>
@@ -319,7 +355,7 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
       </div>
     </form>
   );
-}
+});
 
 // --- Document Editor ---
 
@@ -542,7 +578,8 @@ function DocumentItem({ dealId, doc }: { dealId: string; doc: DocType }) {
 
 // --- Main Tab ---
 
-export function DocumentsTab({ deal }: DocumentsTabProps) {
+export const DocumentsTab = forwardRef<DocumentsTabHandle, DocumentsTabProps>(
+  function DocumentsTab({ deal }, ref) {
   return (
     <section id="section-documents" className="record-section">
       <h3 className="record-section-title">Documents</h3>
@@ -550,7 +587,7 @@ export function DocumentsTab({ deal }: DocumentsTabProps) {
         Attach a PDF (up to 25 MB), jot notes, or both — just give Badger one of
         them. Files open through a short-lived secure link.
       </p>
-      <AddDocumentForm dealId={deal.id} />
+      <AddDocumentForm ref={ref} dealId={deal.id} />
       {deal.documents.length === 0 ? (
         <p className="empty-state empty-state--spaced">No documents yet.</p>
       ) : (
@@ -562,4 +599,4 @@ export function DocumentsTab({ deal }: DocumentsTabProps) {
       )}
     </section>
   );
-}
+});

@@ -15,6 +15,21 @@ Format:
   It points at the runbooks and rules; sessions start there. Would change
   if: the briefing moves or is superseded.
 
+- **2026-08-24 — Badger never auto-names an attached document.** When a file
+  is attached without a name, block the save and make the user name it.
+  Maggie: a filename is a machine string ("Fully Signed ALTA -
+  2026-08-12T133829.999.pdf"), not a description of what the paper is, and
+  Badger can't know which document it's looking at. Would change if: we ever
+  read the document's contents well enough to describe it.
+
+- **2026-08-24 — An attached-but-unsaved document blocks Save Changes.** It
+  is never silently discarded. Root cause of Charlie's "failed" ALTA uploads:
+  the drawer's unsaved-work guard covered Details and More Info but not
+  Documents, so Save Changes (and the X) binned an attached file with no
+  warning and no upload. A file the agent believes is filed, and isn't, is the
+  worst failure this app can have. Would change if: the save flow stops being
+  a single record-level commit.
+
 ## Corrections
 
 *(Date — what was wrong → what's right.)*
