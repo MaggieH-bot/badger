@@ -1,4 +1,11 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 import type { Deal, Document as DocType, DocumentType } from '../../types';
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from '../../constants/pipeline';
 import { useDeals } from '../../store/useDeals';
@@ -7,10 +14,25 @@ import { useAuth } from '../../store/useAuth';
 import { useWorkspaceMembers } from '../../store/useWorkspaceMembers';
 import { buildAssigneeOptions } from '../../utils/assignee';
 import { generateId } from '../../utils/ids';
-import { uploadDocumentFile, getDocumentSignedUrl } from '../../api/documents';
+import {
+  uploadDocumentFile,
+  getDocumentSignedUrl,
+  removeOrphanedUpload,
+} from '../../api/documents';
 
 interface DocumentsTabProps {
   deal: Deal;
+}
+
+/**
+ * Lets the drawer see a document the user has started but not saved.
+ * Without this the drawer's unsaved-work guard was blind to the Documents
+ * section: an attached PDF sitting in an unsubmitted form was thrown away by
+ * Save Changes (or the X) with no warning, and the file was never uploaded.
+ */
+export interface DocumentsTabHandle {
+  hasPendingDocument: () => boolean;
+  flagPendingDocument: () => void;
 }
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -35,8 +57,9 @@ function formatFileSize(bytes: number): string {
 
 // --- Add Document Form ---
 
-function AddDocumentForm({ dealId }: { dealId: string }) {
-  const { dispatch } = useDeals();
+const AddDocumentForm = forwardRef<DocumentsTabHandle, { dealId: string }>(
+  function AddDocumentForm({ dealId }, ref) {
+  const { dispatch, dispatchAndWait } = useDeals();
   const { workspace } = useWorkspace();
   const { user } = useAuth();
   const { members } = useWorkspaceMembers();
@@ -49,7 +72,12 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState<{ title?: string; body?: string; file?: string }>({});
+  const [errors, setErrors] = useState<{
+    title?: string;
+    body?: string;
+    file?: string;
+    save?: string;
+  }>({});
   const [flash, setFlash] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -57,7 +85,7 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
     setTitle('');
     setContent('');
     setDocType('agreement');
-    setAuthor('You');
+    setAuthor(currentUserId ?? '');
     setFile(null);
     setErrors({});
     setBusy(false);
@@ -89,7 +117,13 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    if (!workspace) return;
+    if (!workspace) {
+      // Previously a silent `return`: the button did nothing and said nothing.
+      setErrors({
+        save: "Badger's still waking up — give it a second, then try again.",
+      });
+      return;
+    }
 
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
@@ -140,29 +174,67 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
       }
     }
 
-    dispatch({
-      type: 'ADD_DOCUMENT',
-      dealId,
-      document: {
-        id: documentId,
-        title: trimmedTitle,
-        type: docType,
-        author,
-        createdAt: now,
-        updatedAt: now,
-        content: trimmedContent || undefined,
-        filePath,
-        fileName,
-        fileSize,
-        fileMime,
-      },
-    });
+    // Await the insert rather than firing and forgetting. Previously this
+    // dispatched, immediately declared success and closed the form, so a failed
+    // insert left the document on screen — and gone after the next refresh.
+    try {
+      await dispatchAndWait({
+        type: 'ADD_DOCUMENT',
+        dealId,
+        document: {
+          id: documentId,
+          title: trimmedTitle,
+          type: docType,
+          author,
+          createdAt: now,
+          updatedAt: now,
+          content: trimmedContent || undefined,
+          filePath,
+          fileName,
+          fileSize,
+          fileMime,
+        },
+      });
+    } catch (err) {
+      console.error('[badger] document save failed:', err);
+      // Undo the optimistic add so the list never shows a document the
+      // database doesn't have, and bin the uploaded file so it can't become
+      // an orphan no one can see or delete.
+      dispatch({ type: '__REVERT_DOCUMENT__', dealId, documentId });
+      if (filePath) await removeOrphanedUpload(filePath);
+      // Form stays open with everything the user typed still in it.
+      setErrors({
+        save:
+          err instanceof Error
+            ? `That didn't save: ${err.message}. Nothing's lost — hit Save Document to try again.`
+            : "That didn't save. Nothing's lost — hit Save Document to try again.",
+      });
+      setBusy(false);
+      return;
+    }
 
     reset();
     setOpen(false);
     setFlash(file ? 'Document uploaded.' : 'Document saved.');
     window.setTimeout(() => setFlash(null), 3000);
   }
+
+  // The drawer asks: is there work here that Save Changes would silently bin?
+  // An open form counts as pending once it holds anything worth losing.
+  useImperativeHandle(ref, () => ({
+    hasPendingDocument: () =>
+      open && (file !== null || title.trim() !== '' || content.trim() !== ''),
+    flagPendingDocument: () => {
+      const named = title.trim() !== '';
+      setErrors((prev) => ({
+        ...prev,
+        title: named ? prev.title : 'Give it a name first.',
+        save: named
+          ? "This document isn't filed yet — hit Save Document to put it away."
+          : "Name this document, then hit Save Document. Badger won't file a nameless PDF.",
+      }));
+    },
+  }));
 
   if (!open) {
     return (
@@ -260,6 +332,11 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
         />
         {errors.body && <span className="form-error">{errors.body}</span>}
       </div>
+      {errors.save && (
+        <p className="form-error form-error--block" role="alert">
+          {errors.save}
+        </p>
+      )}
       <div className="form-actions">
         <button
           type="button"
@@ -273,12 +350,12 @@ function AddDocumentForm({ dealId }: { dealId: string }) {
           Cancel
         </button>
         <button type="submit" className="btn btn--primary" disabled={busy}>
-          {busy ? 'Uploading…' : 'Save Document'}
+          {busy ? 'Saving…' : 'Save Document'}
         </button>
       </div>
     </form>
   );
-}
+});
 
 // --- Document Editor ---
 
@@ -501,7 +578,8 @@ function DocumentItem({ dealId, doc }: { dealId: string; doc: DocType }) {
 
 // --- Main Tab ---
 
-export function DocumentsTab({ deal }: DocumentsTabProps) {
+export const DocumentsTab = forwardRef<DocumentsTabHandle, DocumentsTabProps>(
+  function DocumentsTab({ deal }, ref) {
   return (
     <section id="section-documents" className="record-section">
       <h3 className="record-section-title">Documents</h3>
@@ -509,7 +587,7 @@ export function DocumentsTab({ deal }: DocumentsTabProps) {
         Attach a PDF (up to 25 MB), jot notes, or both — just give Badger one of
         them. Files open through a short-lived secure link.
       </p>
-      <AddDocumentForm dealId={deal.id} />
+      <AddDocumentForm ref={ref} dealId={deal.id} />
       {deal.documents.length === 0 ? (
         <p className="empty-state empty-state--spaced">No documents yet.</p>
       ) : (
@@ -521,4 +599,4 @@ export function DocumentsTab({ deal }: DocumentsTabProps) {
       )}
     </section>
   );
-}
+});

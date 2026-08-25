@@ -12,7 +12,7 @@ import { computeInsight } from '../../utils/insights';
 import { BadgerAvatar } from '../BadgerAvatar';
 import { DetailsTab, type DetailsTabHandle } from './DetailsTab';
 import { ActivityTab, type ActivityTabHandle } from './ActivityTab';
-import { DocumentsTab } from './DocumentsTab';
+import { DocumentsTab, type DocumentsTabHandle } from './DocumentsTab';
 import { PrepareChecklistButton } from './PrepareChecklistButton';
 
 type SectionKey =
@@ -81,6 +81,7 @@ export function DealDrawer({
   const mainRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<DetailsTabHandle>(null);
   const activityRef = useRef<ActivityTabHandle>(null);
+  const documentsRef = useRef<DocumentsTabHandle>(null);
 
   const deal: Deal | undefined = deals.find((d) => d.id === dealId);
 
@@ -91,7 +92,9 @@ export function DealDrawer({
   function isAnyDirty(): boolean {
     return (
       (detailsRef.current?.isDirty() ?? false) ||
-      (activityRef.current?.isMoreInfoDirty() ?? false)
+      (activityRef.current?.isMoreInfoDirty() ?? false) ||
+      // A started-but-unsaved document counts: closing would bin the file.
+      (documentsRef.current?.hasPendingDocument() ?? false)
     );
   }
 
@@ -121,6 +124,17 @@ export function DealDrawer({
   // the Overview section so the user sees the inline error.
   function handleSaveAll() {
     if (!deal) return;
+
+    // An attached-but-unsaved document is not something Save Changes may
+    // quietly discard — a file the agent believes is filed, and isn't, is the
+    // worst outcome here. Block, say why, and put them on the form. Badger
+    // can't name the document for them: the filename is a machine string, not
+    // a description of what the paper is.
+    if (documentsRef.current?.hasPendingDocument()) {
+      documentsRef.current.flagPendingDocument();
+      jumpToSection('documents');
+      return;
+    }
 
     const detailsDirty = detailsRef.current?.isDirty() ?? false;
     const moreInfoDirty = activityRef.current?.isMoreInfoDirty() ?? false;
@@ -404,7 +418,7 @@ export function DealDrawer({
               deal={deal}
               onRequestSave={handleSaveAll}
             />
-            <DocumentsTab key={`${deal.id}-docs`} deal={deal} />
+            <DocumentsTab ref={documentsRef} key={`${deal.id}-docs`} deal={deal} />
 
             <section className="record-section">
               <h3 className="record-section-title">The Den</h3>
