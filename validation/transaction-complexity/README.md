@@ -21,6 +21,8 @@ A passing run must:
 - distinguish on-time, delayed, and failed upstream states;
 - respect a documented delay window when one exists;
 - surface lender/title/settlement coordination and financing-fallback review where relevant;
+- identify the professional roles who own the review;
+- surface missing inputs rather than inventing facts;
 - never auto-void a contract, auto-change a settlement date, send a notice, or state a legal conclusion;
 - produce consumer-safe wording that routes contract/legal questions back to the appropriate professional.
 
