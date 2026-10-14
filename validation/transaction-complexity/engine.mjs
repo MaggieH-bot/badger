@@ -161,6 +161,10 @@ export function evaluateImpact(testCase, event) {
         source: edge.source,
         depth: current.depth + 1,
         actionIds,
+        reviewOwners: edge.reviewOwners ?? [],
+        missingInputs: (edge.requiredInputs ?? [])
+          .filter((input) => input.known === false)
+          .map((input) => input.key),
       });
 
       queue.push({ nodeId: edge.to, status: current.status, depth: current.depth + 1 });
@@ -169,12 +173,16 @@ export function evaluateImpact(testCase, event) {
 
   const actionIds = [...new Set(impacted.flatMap((item) => item.actionIds))];
   const affectedNodeIds = [...new Set(impacted.map((item) => item.to))];
+  const responsibleRoles = [...new Set(impacted.flatMap((item) => item.reviewOwners))];
+  const missingInputs = [...new Set(impacted.flatMap((item) => item.missingInputs))];
 
   return {
     caseId: testCase.id,
     event,
     affectedNodeIds,
     actionIds,
+    responsibleRoles,
+    missingInputs,
     impacts: impacted,
   };
 }
