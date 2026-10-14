@@ -14,6 +14,12 @@ export const CASES = [
         relation: 'settlement_dependency',
         maxDelayDays: 5,
         acceptsAssignmentOfFunds: true,
+        reviewOwners: ['agent', 'transaction_coordinator', 'settlement_agent'],
+        requiredInputs: [
+          { key: 'upstreamSettlementStatus', known: true },
+          { key: 'documentedDelayWindow', known: true },
+          { key: 'assignmentOfFundsAllowed', known: true },
+        ],
         source: { type: 'contract_addendum', confidence: 'verified' },
       },
     ],
@@ -23,6 +29,8 @@ export const CASES = [
         event: { transactionId: 'upstream-sale', status: 'on_time', delayDays: 0 },
         expect: {
           affectedNodeIds: ['dependent-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent'],
+          requiredMissingInputs: [],
           requiredActionIds: [
             'confirm_upstream_settlement',
             'confirm_downstream_settlement_on_track',
@@ -36,6 +44,8 @@ export const CASES = [
         event: { transactionId: 'upstream-sale', status: 'delayed', delayDays: 3 },
         expect: {
           affectedNodeIds: ['dependent-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent'],
+          requiredMissingInputs: [],
           requiredActionIds: [
             'review_downstream_settlement_date',
             'coordinate_settlement_parties',
@@ -51,6 +61,8 @@ export const CASES = [
         event: { transactionId: 'upstream-sale', status: 'delayed', delayDays: 6 },
         expect: {
           affectedNodeIds: ['dependent-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent'],
+          requiredMissingInputs: [],
           requiredActionIds: [
             'review_downstream_settlement_date',
             'check_delay_window',
@@ -65,6 +77,8 @@ export const CASES = [
         event: { transactionId: 'upstream-sale', status: 'failed' },
         expect: {
           affectedNodeIds: ['dependent-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent'],
+          requiredMissingInputs: [],
           requiredActionIds: [
             'stop_assuming_downstream_settlement',
             'review_contract_status_with_broker_or_attorney',
@@ -90,6 +104,11 @@ export const CASES = [
         from: 'earlier-buyer-contingency',
         to: 'client-sale',
         relation: 'contingency_dependency',
+        reviewOwners: ['agent', 'transaction_coordinator'],
+        requiredInputs: [
+          { key: 'upstreamContingencyStatus', known: true },
+          { key: 'middleTransactionContractStatus', known: true },
+        ],
         source: { type: 'transaction_communication', confidence: 'verified' },
       },
       {
@@ -98,6 +117,11 @@ export const CASES = [
         to: 'client-purchase',
         relation: 'settlement_dependency',
         financingFallback: true,
+        reviewOwners: ['agent', 'transaction_coordinator', 'settlement_agent', 'lender'],
+        requiredInputs: [
+          { key: 'downstreamContractDelayWindow', known: false },
+          { key: 'finalFinancingFallbackTerms', known: false },
+        ],
         source: { type: 'transaction_communication', confidence: 'verified' },
       },
     ],
@@ -107,6 +131,8 @@ export const CASES = [
         event: { transactionId: 'earlier-buyer-contingency', status: 'on_time', delayDays: 0 },
         expect: {
           affectedNodeIds: ['client-sale', 'client-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent', 'lender'],
+          requiredMissingInputs: ['downstreamContractDelayWindow', 'finalFinancingFallbackTerms'],
           requiredActionIds: [
             'confirm_upstream_contingency_cleared',
             'reconfirm_mid_transaction_readiness',
@@ -121,6 +147,8 @@ export const CASES = [
         event: { transactionId: 'earlier-buyer-contingency', status: 'delayed', delayDays: 2 },
         expect: {
           affectedNodeIds: ['client-sale', 'client-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent', 'lender'],
+          requiredMissingInputs: ['downstreamContractDelayWindow', 'finalFinancingFallbackTerms'],
           requiredActionIds: [
             'review_mid_transaction_risk',
             'review_downstream_timing_buffer',
@@ -137,6 +165,8 @@ export const CASES = [
         event: { transactionId: 'earlier-buyer-contingency', status: 'failed' },
         expect: {
           affectedNodeIds: ['client-sale', 'client-purchase'],
+          requiredRoles: ['agent', 'transaction_coordinator', 'settlement_agent', 'lender'],
+          requiredMissingInputs: ['downstreamContractDelayWindow', 'finalFinancingFallbackTerms'],
           requiredActionIds: [
             'review_mid_transaction_viability',
             'review_downstream_financing_or_contingency_strategy',
