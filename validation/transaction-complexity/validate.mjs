@@ -16,6 +16,8 @@ for (const testCase of CASES) {
     try {
       const result = evaluateImpact(testCase, scenario.event);
       sameMembers(result.affectedNodeIds, scenario.expect.affectedNodeIds);
+      sameMembers(result.responsibleRoles, scenario.expect.requiredRoles);
+      sameMembers(result.missingInputs, scenario.expect.requiredMissingInputs);
 
       for (const required of scenario.expect.requiredActionIds) {
         assert.ok(result.actionIds.includes(required), `missing required action: ${required}`);
@@ -36,6 +38,8 @@ for (const testCase of CASES) {
       console.log(`  PASS ${scenario.id}`);
       console.log(`       affected: ${result.affectedNodeIds.join(' -> ')}`);
       console.log(`       reviews:  ${result.actionIds.join(', ')}`);
+      console.log(`       owners:   ${result.responsibleRoles.join(', ')}`);
+      if (result.missingInputs.length) console.log(`       missing:  ${result.missingInputs.join(', ')}`);
     } catch (error) {
       failures += 1;
       console.error(`  FAIL ${scenario.id}: ${error.message}`);
